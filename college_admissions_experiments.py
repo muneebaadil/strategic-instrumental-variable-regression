@@ -7,27 +7,29 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
-# %%
-### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
-## based on real data from 1000 students
-df = pd.read_csv("clean_gpa.csv")
+import argparse
 
-x_real = df[['new_sat','new_gpa']].to_numpy()
-y_real = df['college_gpa'].to_numpy()
+# # %%
+# ### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
+# ## based on real data from 1000 students
+# df = pd.read_csv("clean_gpa.csv")
 
-## find true causal effects theta*
-# ordinary least squares (ols)
-x_tilde = np.hstack((x_real,np.ones((len(x_real),1)))) # add 1 for intercept
+# x_real = df[['new_sat','new_gpa']].to_numpy()
+# y_real = df['college_gpa'].to_numpy()
 
-m = x_real.shape[1]
-x_sum = np.zeros([m+1,m+1])
-xy_sum = np.zeros(m+1)
+# ## find true causal effects theta*
+# # ordinary least squares (ols)
+# x_tilde = np.hstack((x_real,np.ones((len(x_real),1)))) # add 1 for intercept
 
-for i in range(len(x_real)):
-  x_sum += np.outer(x_tilde[i],x_tilde[i])
-  xy_sum += x_tilde[i]*y_real[i]
+# m = x_real.shape[1]
+# x_sum = np.zeros([m+1,m+1])
+# xy_sum = np.zeros(m+1)
 
-theta_star = np.matmul(np.linalg.inv(x_sum),xy_sum)[:-1]
+# for i in range(len(x_real)):
+#   x_sum += np.outer(x_tilde[i],x_tilde[i])
+#   xy_sum += x_tilde[i]*y_real[i]
+
+# theta_star = np.matmul(np.linalg.inv(x_sum),xy_sum)[:-1]
 
 # set theta* to nice values for synthetic data
 # 1st entry in theta* is for SAT score, 2nd is for HSGPA
@@ -202,7 +204,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   # save estimates and errors for every even round 
   estimates_list = np.zeros([int((num_applicants/2)),2,2])
   error_list = np.zeros([int((num_applicants)/2),2])
-  for t in range(10,num_applicants,2):
+  for t in tqdm(range(10,num_applicants,2), leave=False):
     # centering
     #y_mean = np.mean(y_shuffle[:t])
     #x_mean = np.mean(x_shuffle[:t],axis=0)
