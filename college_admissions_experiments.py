@@ -42,6 +42,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   #           x (observed, manipulated features), y (outcome), 
   #           theta (decision rule), and WWT (effort conversion matrix)
   #           
+  # TODO: rounds of 10? 
   #           estimate_list: OLS & 2SLS estimates @ rounds 10 to num_applicants
   #           error_list: L2-norm of OLS & 2SLS estimates minus true theta*
   #
@@ -81,6 +82,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   # confounding error term g (error on true college GPA)
   g = np.ones(num_applicants)*0.5 # legacy students shifted up
   g[0:half]=-0.5 # first-gen students shifted down
+  # TODO: why do we need a nonzero mean?
   g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
 
   # assessment rule 
@@ -117,7 +119,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
   for i in range(num_applicants):
-    x[i] = z[i] + np.matmul(WWT[i],theta[i])
+    x[i] = z[i] + np.matmul(WWT[i],theta[i]) # optimal solution
   
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
@@ -145,6 +147,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     x_sum = np.zeros([m+1,m+1])
     xy_sum = np.zeros(m+1)
 
+    # TODO: vectorize?
     for i in range(T):
       x_sum += np.outer(x_tilde[i],x_tilde[i])
       xy_sum += x_tilde[i]*y[i]
@@ -160,6 +163,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     xtheta_tilde_sum = np.zeros([m+1,m])
     ytheta_tilde_sum = np.zeros(m+1)
 
+    # TODO: vectorize this? 
     for i in range(T):
       theta_tilde_sum += np.outer(theta_tilde[i],theta_tilde[i])
       xtheta_tilde_sum += np.outer(theta_tilde[i],x[i])
@@ -179,16 +183,12 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     theta_hat_tsls = np.matmul(np.linalg.inv(omega_hat),lambda_hat)
     return theta_hat_tsls
 
-  # save estimates and errors for every even round 
-  estimates_list = np.zeros([int((num_applicants/2)),2,2])
-  error_list = np.zeros([int((num_applicants)/2),2])
-  i=0
-
   # shuffle the samples so types show up randomly
   [x_shuffle,y_shuffle,theta_shuffle] = [x.copy(),y.copy(),theta.copy()]
   shuffle_iter = list(range(len(x)))
   np.random.shuffle(shuffle_iter)
 
+  # TODO: maybe vectorize this?
   j = 0
   for k in shuffle_iter:
     x_shuffle[j] = x[k]
@@ -196,6 +196,10 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     theta_shuffle[j] = theta[k]
     j+=1
 
+  i=0
+  # save estimates and errors for every even round 
+  estimates_list = np.zeros([int((num_applicants/2)),2,2])
+  error_list = np.zeros([int((num_applicants)/2),2])
   for t in range(10,num_applicants,2):
     # centering
     #y_mean = np.mean(y_shuffle[:t])
