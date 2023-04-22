@@ -1,4 +1,6 @@
 # %%
+from time import time 
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt 
@@ -223,7 +225,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
 #@title
 # set T > 10 & in units of 5s for nice plots later 
 T = 5000
-epochs = 10
+epochs = 1
 half = int(T/2)
 
 estimates_list_mean = np.zeros((epochs,half,2,2))
@@ -232,7 +234,7 @@ error_list_mean = np.zeros((epochs,half,2))
 #estimates_list_mean = list()
 #error_list_mean = list()
 
-for i in range(epochs):
+for i in tqdm(range(epochs)):
   np.random.seed(i)
   [estimates_list, error_list, y, x, z, theta, WWT, EW, theta_star] = test_params(num_applicants=T)
   estimates_list_mean[i,:] = estimates_list
