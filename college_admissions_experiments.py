@@ -243,6 +243,16 @@ with open(filename, 'wb') as f:
 #     estimates_list_mean, error_list_mean = pkl.load(f) 
 
 # %%
+# # save to file
+# y.tofile("saved_y_list")
+# x.tofile("saved_x_list")
+# z.tofile("saved_z_list")
+# np.array(WWT).tofile("saved_WWT_list")
+# # EWWT.tofile("saved_EWWT")
+# theta_star.tofile("saved_theta_star")
+# estimates_list_mean.tofile("saved_estimates_list_mean")
+# error_list_mean.tofile("saved_error_list_mean")
+# %%
 ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
 
@@ -519,18 +529,6 @@ plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
 plt.savefig('all_outcome.png', dpi=500, bbox_inches='tight')
 plt.show()
 
-# %%
-# save to file
-estimates_list.tofile("saved_estimates_list")
-error_list.tofile("saved_error_list")
-y.tofile("saved_y_list")
-x.tofile("saved_x_list")
-z.tofile("saved_z_list")
-np.array(WWT).tofile("saved_WWT_list")
-# EWWT.tofile("saved_EWWT")
-theta_star.tofile("saved_theta_star")
-estimates_list_mean.tofile("saved_estimates_list_mean")
-error_list_mean.tofile("saved_error_list_mean")
 
 # %%
 
