@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from sklearn.linear_model import LinearRegression
+
+# %%
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--num-applicants', default=5000, type=int)
@@ -16,7 +18,7 @@ parser.add_argument('--test-run', action='store_true')
 args = parser.parse_args()
 
 
-# # %%
+ # %%
 # ### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
 # ## based on real data from 1000 students
 # df = pd.read_csv("clean_gpa.csv")
@@ -73,43 +75,36 @@ def generate_data(num_applicants):
   # assessment rule 
   theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 1]],num_applicants)
 
-  # effort conversion matrices W_t*W_t^T
-  WWT = list()
-
+  # effort conversion matrices
   EW = np.matrix([[10.0,0],[0,1.0]])
-
-  for i in range(num_applicants):
-    W_t = EW.copy()
-
-    # same W_t for each applicant in our setup
-    # # add noise
-    # noise_mean = [0.5, 0, 0, 0.1]
-    # noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
-
-    # noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape(W_t.shape)
-
-    # if i<half: # disadvantaged
-    #   W_t -= noise
-    # else: # advantaged
-    #   W_t += noise
-
-    WWT.append(np.matmul(W_t,W_t.T))
-  WWT = np.array(WWT)
 
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
   for i in range(num_applicants):
-    x[i] = z[i] + np.matmul(WWT[i],theta[i]) # optimal solution
+    x[i] = z[i] + np.matmul(EW,theta[i]) # optimal solution
 
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
 
   # true outcomes (college gpa)
   y = np.clip(np.matmul(x,theta_star) + g,0,4) # clipped outcomes
-  return z,x,y,EW,WWT,theta,theta_star
+  
+  # our setup addition 
+  # computing admission results.
+  assert x.shape == theta.shape
+  score = (x * theta).sum(axis=-1)
+
+  sort_idx = np.argsort(score)
+  
+  results = np.zeros((num_applicants,))
+  for i, _idx in enumerate(sort_idx):
+    prob = (float(i) / num_applicants) # percentile of this student.
+    results[_idx] = np.random.binomial(n=1, p=prob)
+
+  return z,x,y,EW,theta,theta_star, results
 
 # %%
-def test_params(num_applicants, z, x, y, EW, WWT, theta, theta_star):
+def test_params(num_applicants, x, y, theta, theta_star):
   # inputs:  num_applicants = number of applicants (time horizon T), 
   #          EW = expected effort conversion matrix E[W],
   #          theta_star = true causal effects theta* (set to [0,0.5] by default)
@@ -211,8 +206,8 @@ error_list_mean = np.zeros((epochs,half,2))
 
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, WWT, theta, theta_star = generate_data(num_applicants=T)
-  [estimates_list, error_list] = test_params(T, z, x, y, EW, WWT, theta, theta_star)
+  z,x,y,EW, theta, theta_star, results = generate_data(num_applicants=T)
+  [estimates_list, error_list] = test_params(T, x, y, theta, theta_star)
   estimates_list_mean[i,:] = estimates_list
   error_list_mean[i,:] = error_list
 
@@ -235,7 +230,7 @@ os.makedirs(dirname)
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
 with open(filename, 'wb') as f:
-    pkl.dump((estimates_list_mean, error_list_mean, y,x,z,theta,WWT,EW,theta_star), f)
+    pkl.dump((estimates_list_mean, error_list_mean, y,x,z,theta,EW,theta_star), f)
 
 # %%
 # # save to file
