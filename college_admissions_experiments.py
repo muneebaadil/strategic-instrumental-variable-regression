@@ -41,30 +41,8 @@ args = parser.parse_args()
 # set theta* to nice values for synthetic data
 # 1st entry in theta* is for SAT score, 2nd is for HSGPA
 theta_star = np.array([0,0.5])
-
 # %%
-def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_star=theta_star):
-  # inputs:  num_applicants = number of applicants (time horizon T), 
-  #          EW = expected effort conversion matrix E[W],
-  #          theta_star = true causal effects theta* (set to [0,0.5] by default)
-  #
-  # output:  synthetic data for num_applicants rounds, including:
-  #           z (unobserved, unmanipulated features), 
-  #           x (observed, manipulated features), y (outcome), 
-  #           theta (decision rule), and WWT (effort conversion matrix)
-  #           
-  #           estimate_list: OLS & 2SLS estimates @ rounds 10 to num_applicants
-  #           error_list: L2-norm of OLS & 2SLS estimates minus true theta*
-  #
-  # outline: 1) create synthetic unobserved data (z_t, W_tW_t^T, g_t), 
-  #             add confounding by splitting data into two types split 50/50,
-  #             (1st half disadvantaged, 2nd half advantaged), 
-  #             make z & WW^T worse for disadvantaged, better for advantaged
-  #             & set mean g lesser for disadvantaged, high for advantaged
-  #          2) set decision rule theta_t & solve for x_t and y_t based on model
-  #          3) OLS estimate by regressing x onto y (w/ intercept estimate)
-  #          4) 2SLS estimate by regressing x onto theta, then theta onto y (w/ intercept estimate)
-
+def generate_data(num_applicants):
   half = int(num_applicants/2) 
   m = theta_star.size
 
@@ -90,20 +68,15 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   # confounding error term g (error on true college GPA)
   g = np.ones(num_applicants)*0.5 # legacy students shifted up
   g[0:half]=-0.5 # first-gen students shifted down
-  # TODO: why do we need a nonzero mean?
   g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
 
   # assessment rule 
-  
-  #theta = np.zeros([num_applicants,z.shape[1]])
-  #theta = np.random.normal(1,1,[num_applicants,z.shape[1]])
-  #theta[:,0]*=7.5 # scaling for SAT score
   theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 1]],num_applicants)
 
   # effort conversion matrices W_t*W_t^T
   WWT = list()
 
-  EW = EW
+  EW = np.matrix([[10.0,0],[0,1.0]])
 
   for i in range(num_applicants):
     W_t = EW.copy()
@@ -121,33 +94,43 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     #   W_t += noise
 
     WWT.append(np.matmul(W_t,W_t.T))
-    #if i % 100 == 0:
-    #  print(np.matmul(W_t,W_t.T))
   WWT = np.array(WWT)
 
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
   for i in range(num_applicants):
     x[i] = z[i] + np.matmul(WWT[i],theta[i]) # optimal solution
-  
+
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
 
   # true outcomes (college gpa)
   y = np.clip(np.matmul(x,theta_star) + g,0,4) # clipped outcomes
-  #y = np.matmul(x,theta_star) + g # not clipped outcomes
+  return z,x,y,EW,WWT,theta,theta_star
 
-  '''def ols(x,y,T): # regular
-    # estimate theta*: regress x onto y (with centering)
-    m = x.shape[1]
-    x_sum = np.zeros([m,m])
-    xy_sum = np.zeros(m)
+# %%
+def test_params(num_applicants, z, x, y, EW, WWT, theta, theta_star):
+  # inputs:  num_applicants = number of applicants (time horizon T), 
+  #          EW = expected effort conversion matrix E[W],
+  #          theta_star = true causal effects theta* (set to [0,0.5] by default)
+  #
+  # output:  synthetic data for num_applicants rounds, including:
+  #           z (unobserved, unmanipulated features), 
+  #           x (observed, manipulated features), y (outcome), 
+  #           theta (decision rule), and WWT (effort conversion matrix)
+  #           
+  #           estimate_list: OLS & 2SLS estimates @ rounds 10 to num_applicants
+  #           error_list: L2-norm of OLS & 2SLS estimates minus true theta*
+  #
+  # outline: 1) create synthetic unobserved data (z_t, W_tW_t^T, g_t), 
+  #             add confounding by splitting data into two types split 50/50,
+  #             (1st half disadvantaged, 2nd half advantaged), 
+  #             make z & WW^T worse for disadvantaged, better for advantaged
+  #             & set mean g lesser for disadvantaged, high for advantaged
+  #          2) set decision rule theta_t & solve for x_t and y_t based on model
+  #          3) OLS estimate by regressing x onto y (w/ intercept estimate)
+  #          4) 2SLS estimate by regressing x onto theta, then theta onto y (w/ intercept estimate)
 
-    for i in range(T):
-      x_sum += np.outer(x[i],x[i])
-      xy_sum += x[i]*y[i]
-
-    return np.matmul(np.linalg.inv(x_sum),xy_sum)'''
 
   def ols(x,y,T):
     model = LinearRegression(fit_intercept=True)
@@ -211,7 +194,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     
     i+=1
 
-  return [estimates_list, error_list, y, x, z, theta, WWT, EW, theta_star]
+  return [estimates_list, error_list]
 
 # %%
 #@title
@@ -228,12 +211,10 @@ error_list_mean = np.zeros((epochs,half,2))
 
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  [estimates_list, error_list, y, x, z, theta, WWT, EW, theta_star] = test_params(num_applicants=T)
+  z,x,y,EW, WWT, theta, theta_star = generate_data(num_applicants=T)
+  [estimates_list, error_list] = test_params(T, z, x, y, EW, WWT, theta, theta_star)
   estimates_list_mean[i,:] = estimates_list
   error_list_mean[i,:] = error_list
-
-  #estimates_list_mean.append(estimates_list)
-  #error_list_mean.append(error_list)
 
 # %%
 import pickle as pkl
@@ -381,7 +362,6 @@ def plot_features():
   fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
   plt.savefig(fname, dpi=500)
 
-plot_features()
 # plt.show()
 
 # %%
@@ -414,7 +394,6 @@ def plot_error_estimate():
   plt.savefig(fname, dpi=500, bbox_inches='tight')
   # plt.show()
 
-plot_error_estimate()
 
 # %%
 def plot_outcome():
@@ -450,10 +429,6 @@ def plot_outcome():
   plt.savefig(fname, dpi=500, bbox_inches='tight')
   # plt.show()
 
+plot_features()
+plot_error_estimate()
 plot_outcome()
-
-
-# %%
-
-
-
