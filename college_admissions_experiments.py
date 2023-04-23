@@ -178,6 +178,27 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
 
     # Step 3) estimate theta*: inverse(Omega-hat)*Lambda-hat
     theta_hat_tsls = np.matmul(np.linalg.inv(omega_hat),lambda_hat)
+
+
+    # my implementation
+    # regress x onto theta: estimate omega
+    model = LinearRegression()
+    model.fit(theta[:T], x[:T])
+    omega_hat_ = model.coef_.T
+
+    # regress y onto theta: estimate lambda
+    model = LinearRegression()
+    model.fit(theta[:T], y[:T])
+    lambda_hat_ = model.coef_ 
+
+    # estimate theta^* 
+    theta_hat_tsls_ = np.matmul(
+      np.linalg.inv(omega_hat_), lambda_hat_
+    )
+    
+    assert np.allclose(omega_hat_, omega_hat, rtol=0, atol=1e-5), f"ours: {omega_hat_}; theirs: {omega_hat}"
+    assert np.allclose(lambda_hat_, lambda_hat, rtol=0, atol=1e-5), f"ours: {lambda_hat_}; theirs: {lambda_hat}"
+    assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
     return theta_hat_tsls
 
   # shuffle the samples so types show up randomly
