@@ -6,8 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt 
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
-
+from sklearn.linear_model import LinearRegression
 import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--num-applicants', default=5000, type=int)
+# parser.add_argument('')
+args = parser.parse_args()
 
 # # %%
 # ### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
@@ -46,7 +50,6 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   #           x (observed, manipulated features), y (outcome), 
   #           theta (decision rule), and WWT (effort conversion matrix)
   #           
-  # TODO: rounds of 10? 
   #           estimate_list: OLS & 2SLS estimates @ rounds 10 to num_applicants
   #           error_list: L2-norm of OLS & 2SLS estimates minus true theta*
   #
@@ -59,11 +62,9 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   #          3) OLS estimate by regressing x onto y (w/ intercept estimate)
   #          4) 2SLS estimate by regressing x onto theta, then theta onto y (w/ intercept estimate)
 
-  num_applicants = num_applicants
   half = int(num_applicants/2) 
   m = theta_star.size
 
-  sigma_g = 0.1 # g variance term
   mean_sat = 900
   mean_gpa = 2
   sigma_sat = 200
@@ -104,16 +105,17 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
   for i in range(num_applicants):
     W_t = EW.copy()
 
-    # add noise
-    noise_mean = [0.5, 0, 0, 0.1]
-    noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
+    # same W_t for each applicant in our setup
+    # # add noise
+    # noise_mean = [0.5, 0, 0, 0.1]
+    # noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
 
-    noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape(W_t.shape)
+    # noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape(W_t.shape)
 
-    if i<half: # disadvantaged
-      W_t -= noise
-    else: # advantaged
-      W_t += noise
+    # if i<half: # disadvantaged
+    #   W_t -= noise
+    # else: # advantaged
+    #   W_t += noise
 
     WWT.append(np.matmul(W_t,W_t.T))
     #if i % 100 == 0:
@@ -144,20 +146,11 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
 
     return np.matmul(np.linalg.inv(x_sum),xy_sum)'''
 
-  def ols(x,y,T): # with intercept estimation
-    x_tilde = np.hstack((x,np.ones((len(x),1)))) # for parameter estimation
-
-    m = x.shape[1]
-    x_sum = np.zeros([m+1,m+1])
-    xy_sum = np.zeros(m+1)
-
-    # TODO: vectorize?
-    for i in range(T):
-      x_sum += np.outer(x_tilde[i],x_tilde[i])
-      xy_sum += x_tilde[i]*y[i]
-
-    theta_hat_ols = np.matmul(np.linalg.inv(x_sum),xy_sum)
-    return theta_hat_ols[:m]
+  def ols(x,y,T):
+    model = LinearRegression(fit_intercept=True)
+    model.fit(x[:T], y[:T])
+    theta_hat_ols_ = model.coef_
+    return theta_hat_ols_
     
   def tsls(x,y,theta,T): # runs until round T
     theta_tilde = np.hstack((theta,np.ones((len(theta),1)))) # for parameter estimation
@@ -226,7 +219,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
 # %%
 #@title
 # set T > 10 & in units of 5s for nice plots later 
-T = 5000
+T = args.num_applicants
 epochs = 1
 half = int(T/2)
 
