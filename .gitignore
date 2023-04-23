@@ -1,3 +1,4 @@
 *.png
 *.csv
 college_admission_*
+experiments/
