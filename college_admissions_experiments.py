@@ -255,8 +255,6 @@ filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
 with open(filename, 'wb') as f:
     pkl.dump((estimates_list_mean, error_list_mean, y,x,z,theta,WWT,EW,theta_star), f)
-# with open('college_admission_20210711-080811', 'rb') as f:
-#     estimates_list_mean, error_list_mean = pkl.load(f) 
 
 # %%
 # # save to file
@@ -269,289 +267,190 @@ with open(filename, 'wb') as f:
 # estimates_list_mean.tofile("saved_estimates_list_mean")
 # error_list_mean.tofile("saved_error_list_mean")
 # %%
-## plot first-gen & legacy shift unobservable features (z) to observable (x) 
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
+def plot_features():
+  ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
+  fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
 
-### first-gen HS GPA
-ax1.hist(x[0:half,1],bins='auto', label='after manipulation', color='darkorange')
+  ### first-gen HS GPA
+  ax1.hist(x[0:half,1],bins='auto', label='after manipulation', color='darkorange')
 
-ax1.axvline(x=np.mean(x[0:half,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
-ax1.axvline(x=np.mean(x[0:half,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
-ax1.axvline(x=np.mean(x[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
+  ax1.axvline(x=np.mean(x[0:half,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
+  ax1.axvline(x=np.mean(x[0:half,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
+  ax1.axvline(x=np.mean(x[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
 
-ax1.set_title("observable high school GPA (x1)")
-ax1.set(ylabel='Number of applicants')
+  ax1.set_title("observable high school GPA (x1)")
+  ax1.set(ylabel='Number of applicants')
 
-ax1.hist(z[0:half,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
-ax1.axvline(x=np.mean(z[0:half,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
-ax1.axvline(x=np.mean(z[0:half,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-ax1.axvline(x=np.mean(z[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
+  ax1.hist(z[0:half,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax1.axvline(x=np.mean(z[0:half,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
+  ax1.axvline(x=np.mean(z[0:half,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
+  ax1.axvline(x=np.mean(z[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
-ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
-ax1.set_xlim(0,4)
-ax1.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
-ax1.set_ylabel('Number of applicants',fontsize=14)
-ax1.tick_params(axis="x", labelsize=14)
-ax1.tick_params(axis="y", labelsize=14)
+  ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
+  ax1.set_xlim(0,4)
+  ax1.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
+  ax1.set_ylabel('Number of applicants',fontsize=14)
+  ax1.tick_params(axis="x", labelsize=14)
+  ax1.tick_params(axis="y", labelsize=14)
 
-ax1.legend()
+  ax1.legend()
 
-### 2) first-gen SAT
-ax2.hist(x[0:half,0], bins='auto', label='after manipulation', color='orange')
-ax2.axvline(x=np.mean(x[0:half,0]),color='blue',)
-ax2.axvline(x=np.mean(x[0:half,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
-ax2.axvline(x=np.mean(x[0:half,0]), linestyle='-', color = 'red', linewidth = 4) # after mean
-ax2.axvline(x=np.mean(x[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # after mean
+  ### 2) first-gen SAT
+  ax2.hist(x[0:half,0], bins='auto', label='after manipulation', color='orange')
+  ax2.axvline(x=np.mean(x[0:half,0]),color='blue',)
+  ax2.axvline(x=np.mean(x[0:half,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
+  ax2.axvline(x=np.mean(x[0:half,0]), linestyle='-', color = 'red', linewidth = 4) # after mean
+  ax2.axvline(x=np.mean(x[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # after mean
 
-ax2.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
+  ax2.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
 
-ax2.hist(z[0:half,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax2.hist(z[0:half,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
 
-ax2.axvline(x=np.mean(z[0:half,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-ax2.axvline(x=np.mean(z[0:half,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-ax2.axvline(x=np.mean(z[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
+  ax2.axvline(x=np.mean(z[0:half,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax2.axvline(x=np.mean(z[0:half,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
+  ax2.axvline(x=np.mean(z[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
-ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
-ax2.set_xlim(400,1600)
-ax2.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
-ax2.set_ylabel('Number of applicants',fontsize=14)
-ax2.tick_params(axis="x", labelsize=14)
-ax2.tick_params(axis="y", labelsize=14)
+  ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
+  ax2.set_xlim(400,1600)
+  ax2.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
+  ax2.set_ylabel('Number of applicants',fontsize=14)
+  ax2.tick_params(axis="x", labelsize=14)
+  ax2.tick_params(axis="y", labelsize=14)
 
-#ax2.legend(loc='upper left', fontsize=14)
-ax2.legend()
+  #ax2.legend(loc='upper left', fontsize=14)
+  ax2.legend()
 
-### 3) non-first-gen HS GPA
-ax3.hist(x[half:,1],bins='auto', label='after manipulation', color='green')
+  ### 3) non-first-gen HS GPA
+  ax3.hist(x[half:,1],bins='auto', label='after manipulation', color='green')
 
-ax3.hist(z[half:,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax3.hist(z[half:,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
 
-ax3.axvline(x=np.mean(z[half:,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-ax3.axvline(x=np.mean(z[half:,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-ax3.axvline(x=np.mean(z[half:,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
+  ax3.axvline(x=np.mean(z[half:,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax3.axvline(x=np.mean(z[half:,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
+  ax3.axvline(x=np.mean(z[half:,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
-ax3.axvline(x=np.mean(x[half:,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
-ax3.axvline(x=np.mean(x[half:,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
-ax3.axvline(x=np.mean(x[half:,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
+  ax3.axvline(x=np.mean(x[half:,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
+  ax3.axvline(x=np.mean(x[half:,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
+  ax3.axvline(x=np.mean(x[half:,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
 
-ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
-ax3.set_xlim(0,4)
-ax3.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
-ax3.set_ylabel('Number of applicants',fontsize=14)
-ax3.tick_params(axis="x", labelsize=14)
-ax3.tick_params(axis="y", labelsize=14)
+  ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
+  ax3.set_xlim(0,4)
+  ax3.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
+  ax3.set_ylabel('Number of applicants',fontsize=14)
+  ax3.tick_params(axis="x", labelsize=14)
+  ax3.tick_params(axis="y", labelsize=14)
 
-ax3.legend()
+  ax3.legend()
 
 
-### 4) non-first-gen SAT
-ax4.hist(x[half:,0], bins='auto', label='after manipulation', color='green')
+  ### 4) non-first-gen SAT
+  ax4.hist(x[half:,0], bins='auto', label='after manipulation', color='green')
 
-ax4.hist(z[half:,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax4.hist(z[half:,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
 
-ax4.axvline(x=np.mean(z[half:,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-ax4.axvline(x=np.mean(z[half:,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-ax4.axvline(x=np.mean(z[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
+  ax4.axvline(x=np.mean(z[half:,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax4.axvline(x=np.mean(z[half:,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
+  ax4.axvline(x=np.mean(z[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
-ax4.axvline(x=np.mean(x[half:,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
-ax4.axvline(x=np.mean(x[half:,0]), linestyle='-', color = 'red', linewidth = 4) # before mean
-ax4.axvline(x=np.mean(x[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
+  ax4.axvline(x=np.mean(x[half:,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
+  ax4.axvline(x=np.mean(x[half:,0]), linestyle='-', color = 'red', linewidth = 4) # before mean
+  ax4.axvline(x=np.mean(x[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
-ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
-ax4.set_xlim(400,1600)
-ax4.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
-ax4.set_ylabel('Number of applicants',fontsize=14)
-ax4.tick_params(axis="x", labelsize=14)
-ax4.tick_params(axis="y", labelsize=14)
+  ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
+  ax4.set_xlim(400,1600)
+  ax4.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
+  ax4.set_ylabel('Number of applicants',fontsize=14)
+  ax4.tick_params(axis="x", labelsize=14)
+  ax4.tick_params(axis="y", labelsize=14)
 
-#ax4.legend(bbox_to_anchor=(-3, 0), loc='upper left', fontsize=14,ncol=4)
-ax4.legend()
+  #ax4.legend(bbox_to_anchor=(-3, 0), loc='upper left', fontsize=14,ncol=4)
+  ax4.legend()
 
-## legend
-pre_fg = Patch(color='yellow', label='disadvantaged unobserved (unmanipulated)', alpha=0.75)
-post_fg = Patch(color='darkorange', label='disadvantaged observed (manipulated)')
+  ## legend
+  pre_fg = Patch(color='yellow', label='disadvantaged unobserved (unmanipulated)', alpha=0.75)
+  post_fg = Patch(color='darkorange', label='disadvantaged observed (manipulated)')
 
-pre_ls = Patch(color='lightgreen', label='legacy unobserved (unmanipulated)', alpha=0.75)
-post_ls = Patch(color='green', label='legacy observed (manipulated)')
+  pre_ls = Patch(color='lightgreen', label='legacy unobserved (unmanipulated)', alpha=0.75)
+  post_ls = Patch(color='green', label='legacy observed (manipulated)')
 
-before_mean = Line2D([0], [0], color='blue', linestyle='--', lw=2, label='mean before manipulation')
-after_mean = Line2D([0], [0], color='red', linestyle='--', lw=2, label='mean after manipulation')
+  before_mean = Line2D([0], [0], color='blue', linestyle='--', lw=2, label='mean before manipulation')
+  after_mean = Line2D([0], [0], color='red', linestyle='--', lw=2, label='mean after manipulation')
 
-fig.tight_layout()
+  fig.tight_layout()
 
-fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
-plt.savefig(fname, dpi=500)
+  fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
+  plt.savefig(fname, dpi=500)
+
+plot_features()
 # plt.show()
 
 # %%
 # vars for pyplot
-fig,ax=plt.subplots()
-ticks = list(range(int(T/5), T+1, int(T/5)))
-ticks.insert(0,1)
+def plot_error_estimate():
+  fig,ax=plt.subplots()
+  ticks = list(range(int(T/5), T+1, int(T/5)))
+  ticks.insert(0,1)
 
-# plot error of OLS vs 2SLS with error bar
-plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
-             color='darkorange', ecolor='wheat', label='OLS',elinewidth=10)
-plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
-             color='darkblue', ecolor='lightblue', label='2SLS',elinewidth=10)
-plt.ylim(0,.25)
-plt.xticks(fontsize=14)
-plt.yticks(fontsize=14)
-plt.xlim(50,T-11)
+  # plot error of OLS vs 2SLS with error bar
+  plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
+              color='darkorange', ecolor='wheat', label='OLS',elinewidth=10)
+  plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
+              color='darkblue', ecolor='lightblue', label='2SLS',elinewidth=10)
+  plt.ylim(0,.25)
+  plt.xticks(fontsize=14)
+  plt.yticks(fontsize=14)
+  plt.xlim(50,T-11)
 
-plt.xlabel('Number of applicants (rounds)', fontsize=14)
-plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
+  plt.xlabel('Number of applicants (rounds)', fontsize=14)
+  plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
 
-plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
+  plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
 
-plt.legend(fontsize=14)
-#plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
-#plt.title("Estimation error over rounds for OLS vs 2SLS")
+  plt.legend(fontsize=14)
+  #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
+  #plt.title("Estimation error over rounds for OLS vs 2SLS")
 
-fname = os.path.join(dirname, 'error_estimation.png')
-plt.savefig(fname, dpi=500, bbox_inches='tight')
-# plt.show()
+  fname = os.path.join(dirname, 'error_estimation.png')
+  plt.savefig(fname, dpi=500, bbox_inches='tight')
+  # plt.show()
 
-# %%
-# plot causal effect estimates --OLS vs 2SLS vs theta*
-fig,ax=plt.subplots()
-temp = 100*estimates_list_mean
-tsls_mean = np.mean(temp,axis=0)[:,1,0]
-ols_mean = np.mean(temp,axis=0)[:,0,0]
-tsls_std = np.std(temp,axis=0)[:,1,0]
-ols_std = np.std(temp,axis=0)[:,0,0]
-
-plt.errorbar(list(range(2,T+1,2)), tsls_mean, yerr=tsls_std, color='darkblue', ecolor='lightblue', label='2SLS effect estimate',elinewidth=10)
-plt.errorbar(list(range(2,T+1,2)), ols_mean, yerr=ols_std, color='darkorange', ecolor='wheat', label='OLS effect estimate',elinewidth=10)
-plt.axhline(theta_star[0],label='True effect of SAT on college GPA', color='red',linestyle='dashed')
-plt.axhline(theta_star[0], linestyle='-', color = 'white', linewidth = 4)
-plt.axhline(theta_star[0], linestyle='--', color = 'red', linewidth = 4)
-
-#plt.set_title("Estimated SAT effect estimation")
-plt.xlabel('Number of applicants (rounds)',fontsize=14)
-plt.ylabel('Estimated college GPA change \n per 100 point SAT score increase',fontsize=14)
-plt.xlim(150,T-11)
-plt.xticks(fontsize=14)
-plt.yticks(np.arange(-1,1,step=0.05), fontsize=14)
-# plt.ylim(-.2,0.4)
-plt.ylim(-0.1,0.1)
-
-plt.legend(fontsize=12)
-
-fname = os.path.join(dirname, 'estimate_convergence.png')
-plt.savefig(fname, dpi=500, bbox_inches='tight')
-# plt.show()
+plot_error_estimate()
 
 # %%
-# plot causal effect estimates --OLS vs 2SLS vs theta*
-fig,ax=plt.subplots()
-temp = estimates_list_mean
-tsls_mean = np.mean(temp,axis=0)[:,1,1]
-ols_mean = np.mean(temp,axis=0)[:,0,1]
-tsls_std = np.std(temp,axis=0)[:,1,1]
-ols_std = np.std(temp,axis=0)[:,0,1]
+def plot_outcome():
+  fig,ax=plt.subplots()
+  plt.hist(y,bins='auto',label='combined')
+  plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
+  plt.axvline(x=np.mean(y), linestyle='-', color = 'blue', linewidth = 4)
+  plt.axvline(x=np.mean(y), linestyle='--', color = 'white', linewidth = 4)
 
-plt.errorbar(list(range(2,T+1,2)), tsls_mean, yerr=tsls_std, color='darkblue', ecolor='lightblue', label='2SLS effect estimate',elinewidth=10)
-plt.errorbar(list(range(2,T+1,2)), ols_mean, yerr=ols_std, color='darkorange', ecolor='wheat', label='OLS effect estimate',elinewidth=10)
-plt.axhline(theta_star[1],label='True effect of HS GPA on college GPA', color='red',linestyle='dashed')
-plt.axhline(theta_star[1], linestyle='-', color = 'white', linewidth = 4)
-plt.axhline(theta_star[1], linestyle='--', color = 'red', linewidth = 4)
+  # disadvantaged
+  plt.hist(y[0:half],bins='auto',label='disadvantaged', alpha=.85)
+  plt.axvline(x=np.mean(y[0:half]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
+  plt.axvline(x=np.mean(y[0:half]), linestyle='-', color = 'orange', linewidth = 4)
+  plt.axvline(x=np.mean(y[0:half]), linestyle='--', color = 'white', linewidth = 4)
 
-#plt.set_title("Estimated SAT effect estimation")
-plt.xlabel('Number of applicants (rounds)',fontsize=14)
-plt.ylabel('Effect of HS GPA increase \n on college GPA change',fontsize=14)
-plt.xlim(150,T-11)
-plt.xticks(fontsize=14)
-plt.yticks(np.arange(-1,1,step=0.1), fontsize=14)
-# plt.ylim(-.2,0.4)
-plt.ylim(0.3,0.8)
+  # advantaged
+  plt.hist(y[half:],bins='auto',label='advantaged', alpha=0.7)
+  plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
+  plt.axvline(x=np.mean(y[half:]),color='green',linestyle='-', linewidth = 4)
+  plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'white', linewidth = 4)
 
-plt.legend(fontsize=12, loc='upper right')
+  plt.xlim(0,4)
+  plt.xticks(fontsize=14)
+  plt.yticks(fontsize=14)
+  plt.xlabel('College GPA (4.0 scale)', fontsize=14)
+  plt.ylabel('Number of applicants', fontsize=14)
 
-fname = os.path.join(dirname, 'estimate_convergence-HS-GPA.png')
-plt.savefig(fname, dpi=500, bbox_inches='tight')
-# plt.show()
+  #plt.title("True college GPA (y) for disadvantaged vs. advantaged students")
 
-# %%
-# plot causal effect estimates --OLS vs 2SLS vs theta*
-fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,4),constrained_layout=True)
-ax1.errorbar(list(range(2,T+1,2)), np.mean(estimates_list_mean,axis=0)[:,1,0], yerr=np.std(estimates_list_mean,axis=0)[:,1,0], 
-             color='darkblue', ecolor='lightblue', label='2SLS effect estimate',elinewidth=10)
-ax1.errorbar(list(range(2,T+1,2)), np.mean(estimates_list_mean,axis=0)[:,0,0], yerr=np.std(estimates_list_mean,axis=0)[:,0,0], 
-             color='darkorange', ecolor='wheat', label='OLS effect estimate',elinewidth=10)
-ax1.axhline(theta_star[0],label='True effect of SAT on college GPA', color='red',linestyle='dashed')
-ax1.axhline(theta_star[0], linestyle='-', color = 'white', linewidth = 4)
-ax1.axhline(theta_star[0], linestyle='--', color = 'red', linewidth = 4)
+  plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
 
-#ax1.set_title("Estimated SAT effect estimation")
-ax1.set_xlabel('Number of applicants (rounds)',fontsize=14)
-# ax1.set_ylabel('Estimated HS GPA effect on college GPA',fontsize=14)
-ax1.set_ylabel('Estimated college GPA change\n per 100 points SAT score increase', fontsize=14)
-ax1.set_xlim(150,T-11)
-ax1.tick_params(axis="x", labelsize=14)
-ax1.tick_params(axis="y", labelsize=14)
-ax1.set_ylim(-.002,0.004)
+  fname = os.path.join(dirname, 'all_outcome.png')
+  plt.savefig(fname, dpi=500, bbox_inches='tight')
+  # plt.show()
 
-ax1.legend(fontsize=12)
-
-ax2.errorbar(list(range(2,T+1,2)), np.mean(estimates_list_mean,axis=0)[:,1,1], yerr=np.std(estimates_list_mean,axis=0)[:,1,1], 
-             color='darkblue', ecolor='lightblue', label='2SLS effect estimate',elinewidth=10)
-ax2.errorbar(list(range(2,T+1,2)), np.mean(estimates_list_mean,axis=0)[:,0,1], yerr=np.std(estimates_list_mean,axis=0)[:,0,1], 
-             color='darkorange', ecolor='wheat', label='OLS effect estimate',elinewidth=10)
-
-ax2.axhline(theta_star[1],label='True effect of SAT on college GPA', color='red',linestyle='dashed')
-ax2.axhline(theta_star[1], linestyle='-', color = 'white', linewidth = 4)
-ax2.axhline(theta_star[1], linestyle='--', color = 'red', linewidth = 4)
-
-#ax2.set_title("Estimated HS GPA effect estimation")
-ax2.set_xlabel('Number of applicants (rounds)',fontsize=14)
-ax2.set_ylabel('Estimated HS GPA effect on college GPA',fontsize=12)
-ax2.tick_params(axis="x", labelsize=14)
-ax2.tick_params(axis="y", labelsize=14)
-ax2.set_xlim(150,T-11)
-ax2.set_ylim(.4,.85)
-
-ax2.legend(fontsize=12)
-
-fname = os.path.join(dirname, 'estimate_convergence.png')
-plt.savefig(fname, dpi=500, bbox_inches='tight')
-# plt.show()
-
-# %%
-#@title  { form-width: "20%" }
-## plot college gpa (outcome y)
-# combined
-fig,ax=plt.subplots()
-plt.hist(y,bins='auto',label='combined')
-plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
-plt.axvline(x=np.mean(y), linestyle='-', color = 'blue', linewidth = 4)
-plt.axvline(x=np.mean(y), linestyle='--', color = 'white', linewidth = 4)
-
-# disadvantaged
-plt.hist(y[0:half],bins='auto',label='disadvantaged', alpha=.85)
-plt.axvline(x=np.mean(y[0:half]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
-plt.axvline(x=np.mean(y[0:half]), linestyle='-', color = 'orange', linewidth = 4)
-plt.axvline(x=np.mean(y[0:half]), linestyle='--', color = 'white', linewidth = 4)
-
-# advantaged
-plt.hist(y[half:],bins='auto',label='advantaged', alpha=0.7)
-plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
-plt.axvline(x=np.mean(y[half:]),color='green',linestyle='-', linewidth = 4)
-plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'white', linewidth = 4)
-
-plt.xlim(0,4)
-plt.xticks(fontsize=14)
-plt.yticks(fontsize=14)
-plt.xlabel('College GPA (4.0 scale)', fontsize=14)
-plt.ylabel('Number of applicants', fontsize=14)
-
-#plt.title("True college GPA (y) for disadvantaged vs. advantaged students")
-
-plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
-
-fname = os.path.join(dirname, 'all_outcome.png')
-plt.savefig(fname, dpi=500, bbox_inches='tight')
-# plt.show()
+plot_outcome()
 
 
 # %%
