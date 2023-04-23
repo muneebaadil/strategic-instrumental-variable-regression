@@ -1,4 +1,5 @@
 # %%
+import os
 from time import time 
 from tqdm import tqdm
 import pandas as pd
@@ -10,7 +11,6 @@ from sklearn.linear_model import LinearRegression
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--num-applicants', default=5000, type=int)
-# parser.add_argument('')
 args = parser.parse_args()
 
 # # %%
@@ -236,7 +236,11 @@ for i in tqdm(range(epochs)):
 import pickle as pkl
 import time
 timestr = time.strftime('%Y%m%d-%H%H%S')
-filename = 'college_admission_'+timestr
+
+dirname = os.path.join('experiments', f'{timestr}')
+os.makedirs(dirname)
+filename = os.path.join(dirname, "data")
+# filename = 'college_admission_'+timestr
 with open(filename, 'wb') as f:
     pkl.dump((estimates_list_mean, error_list_mean, y,x,z,theta,WWT,EW,theta_star), f)
 # with open('college_admission_20210711-080811', 'rb') as f:
@@ -363,11 +367,13 @@ after_mean = Line2D([0], [0], color='red', linestyle='--', lw=2, label='mean aft
 
 fig.tight_layout()
 
-plt.savefig('fg-ls_shifted_features.png', dpi=500)
-plt.show()
+fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
+plt.savefig(fname, dpi=500)
+# plt.show()
 
 # %%
 # vars for pyplot
+fig,ax=plt.subplots()
 ticks = list(range(int(T/5), T+1, int(T/5)))
 ticks.insert(0,1)
 
@@ -392,11 +398,13 @@ plt.legend(fontsize=14)
 #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
 #plt.title("Estimation error over rounds for OLS vs 2SLS")
 
-plt.savefig('error_estimation.png', dpi=500, bbox_inches='tight')
-plt.show()
+fname = os.path.join(dirname, 'error_estimation.png')
+plt.savefig(fname, dpi=500, bbox_inches='tight')
+# plt.show()
 
 # %%
 # plot causal effect estimates --OLS vs 2SLS vs theta*
+fig,ax=plt.subplots()
 temp = 100*estimates_list_mean
 tsls_mean = np.mean(temp,axis=0)[:,1,0]
 ols_mean = np.mean(temp,axis=0)[:,0,0]
@@ -420,11 +428,13 @@ plt.ylim(-0.1,0.1)
 
 plt.legend(fontsize=12)
 
-plt.savefig('estimate_convergence.png', dpi=500, bbox_inches='tight')
-plt.show()
+fname = os.path.join(dirname, 'estimate_convergence.png')
+plt.savefig(fname, dpi=500, bbox_inches='tight')
+# plt.show()
 
 # %%
 # plot causal effect estimates --OLS vs 2SLS vs theta*
+fig,ax=plt.subplots()
 temp = estimates_list_mean
 tsls_mean = np.mean(temp,axis=0)[:,1,1]
 ols_mean = np.mean(temp,axis=0)[:,0,1]
@@ -448,8 +458,9 @@ plt.ylim(0.3,0.8)
 
 plt.legend(fontsize=12, loc='upper right')
 
-plt.savefig('estimate_convergence-HS-GPA.png', dpi=500, bbox_inches='tight')
-plt.show()
+fname = os.path.join(dirname, 'estimate_convergence-HS-GPA.png')
+plt.savefig(fname, dpi=500, bbox_inches='tight')
+# plt.show()
 
 # %%
 # plot causal effect estimates --OLS vs 2SLS vs theta*
@@ -492,13 +503,15 @@ ax2.set_ylim(.4,.85)
 
 ax2.legend(fontsize=12)
 
-plt.savefig('estimate_convergence.png', dpi=500, bbox_inches='tight')
-plt.show()
+fname = os.path.join(dirname, 'estimate_convergence.png')
+plt.savefig(fname, dpi=500, bbox_inches='tight')
+# plt.show()
 
 # %%
 #@title  { form-width: "20%" }
 ## plot college gpa (outcome y)
 # combined
+fig,ax=plt.subplots()
 plt.hist(y,bins='auto',label='combined')
 plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
 plt.axvline(x=np.mean(y), linestyle='-', color = 'blue', linewidth = 4)
@@ -526,8 +539,9 @@ plt.ylabel('Number of applicants', fontsize=14)
 
 plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
 
-plt.savefig('all_outcome.png', dpi=500, bbox_inches='tight')
-plt.show()
+fname = os.path.join(dirname, 'all_outcome.png')
+plt.savefig(fname, dpi=500, bbox_inches='tight')
+# plt.show()
 
 
 # %%
