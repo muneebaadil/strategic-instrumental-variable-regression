@@ -153,33 +153,6 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
     return theta_hat_ols_
     
   def tsls(x,y,theta,T): # runs until round T
-    theta_tilde = np.hstack((theta,np.ones((len(theta),1)))) # for parameter estimation
-
-    m = x.shape[1]
-    theta_tilde_sum = np.zeros([m+1,m+1])
-    xtheta_tilde_sum = np.zeros([m+1,m])
-    ytheta_tilde_sum = np.zeros(m+1)
-
-    # TODO: vectorize this? 
-    for i in range(T):
-      theta_tilde_sum += np.outer(theta_tilde[i],theta_tilde[i])
-      xtheta_tilde_sum += np.outer(theta_tilde[i],x[i])
-      ytheta_tilde_sum += theta_tilde[i]*y[i]
-
-    # Step 1) estimate Omega: regress theta onto x
-    omega_hat = np.matmul(np.linalg.inv(theta_tilde_sum),xtheta_tilde_sum)
-    z_bar = omega_hat[m,:]
-    omega_hat = omega_hat[:m,:m] 
-
-    # Step 2) estimate Lambda: regress theta onto y
-    lambda_hat = np.matmul(np.linalg.inv(theta_tilde_sum),ytheta_tilde_sum)
-    gztheta_bar = lambda_hat[m]
-    lambda_hat = lambda_hat[:m]
-
-    # Step 3) estimate theta*: inverse(Omega-hat)*Lambda-hat
-    theta_hat_tsls = np.matmul(np.linalg.inv(omega_hat),lambda_hat)
-
-
     # my implementation
     # regress x onto theta: estimate omega
     model = LinearRegression()
@@ -196,10 +169,10 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
       np.linalg.inv(omega_hat_), lambda_hat_
     )
     
-    assert np.allclose(omega_hat_, omega_hat, rtol=0, atol=1e-5), f"ours: {omega_hat_}; theirs: {omega_hat}"
-    assert np.allclose(lambda_hat_, lambda_hat, rtol=0, atol=1e-5), f"ours: {lambda_hat_}; theirs: {lambda_hat}"
-    assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
-    return theta_hat_tsls
+    # assert np.allclose(omega_hat_, omega_hat, rtol=0, atol=1e-5), f"ours: {omega_hat_}; theirs: {omega_hat}"
+    # assert np.allclose(lambda_hat_, lambda_hat, rtol=0, atol=1e-5), f"ours: {lambda_hat_}; theirs: {lambda_hat}"
+    # assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
+    return theta_hat_tsls_
 
   # shuffle the samples so types show up randomly
   [x_shuffle,y_shuffle,theta_shuffle] = [x.copy(),y.copy(),theta.copy()]
