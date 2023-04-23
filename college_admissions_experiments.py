@@ -11,6 +11,7 @@ from sklearn.linear_model import LinearRegression
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--num-applicants', default=5000, type=int)
+parser.add_argument('--num-repeat', default=10, type=int)
 args = parser.parse_args()
 
 # # %%
@@ -214,7 +215,7 @@ def test_params(num_applicants=1000, EW = np.matrix([[10.0,0],[0,1.0]]), theta_s
 #@title
 # set T > 10 & in units of 5s for nice plots later 
 T = args.num_applicants
-epochs = 1
+epochs = args.num_repeat
 half = int(T/2)
 
 estimates_list_mean = np.zeros((epochs,half,2,2))
