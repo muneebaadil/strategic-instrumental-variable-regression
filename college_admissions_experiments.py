@@ -12,7 +12,9 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--num-applicants', default=5000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
+parser.add_argument('--test-run', action='store_true')
 args = parser.parse_args()
+
 
 # # %%
 # ### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
@@ -238,8 +240,17 @@ import pickle as pkl
 import time
 timestr = time.strftime('%Y%m%d-%H%H%S')
 
-dirname = os.path.join('experiments', f'{timestr}')
+if not args.test_run:
+  dirname = os.path.join('experiments', f'{timestr}')
+else:
+  dirname = os.path.join('experiments',f'test-run')
+  if os.path.exists(dirname):
+    import shutil
+    shutil.rmtree(dirname)
+  
 os.makedirs(dirname)
+
+
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
 with open(filename, 'wb') as f:
@@ -389,11 +400,9 @@ plt.yticks(fontsize=14)
 plt.xlim(50,T-11)
 
 plt.xlabel('Number of applicants (rounds)', fontsize=14)
-plt.ylabel('Admissions effect estimate error', fontsize=14)
+plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
 
 plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
-plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), linestyle='-', color = 'white', linewidth = 4)
-plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), linestyle='--', color = 'red', linewidth = 4)
 
 plt.legend(fontsize=14)
 #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
