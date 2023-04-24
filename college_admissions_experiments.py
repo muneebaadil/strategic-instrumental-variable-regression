@@ -12,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 #%%
 from types import SimpleNamespace
 # for notebook. 
-args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True)
+args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True, admit_all=False)
 
 # %%
 import argparse
@@ -20,6 +20,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--num-applicants', default=5000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
+parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 args = parser.parse_args()
 
 
@@ -49,7 +50,7 @@ args = parser.parse_args()
 # 1st entry in theta* is for SAT score, 2nd is for HSGPA
 theta_star = np.array([0,0.5])
 # %%
-def generate_data(num_applicants):
+def generate_data(num_applicants, admit_all):
   half = int(num_applicants/2) 
   m = theta_star.size
 
@@ -98,21 +99,19 @@ def generate_data(num_applicants):
   # computing admission results.
   assert x.shape == theta.shape
   scores = (x * theta).sum(axis=-1)
-  w = np.zeros_like(scores)
+  if not admit_all:
+    w = np.zeros_like(scores)
+    for idx, score in enumerate(scores):
+      prob = np.mean(scores <= score)
+      w[idx] = np.random.binomial(n=1, p=prob)
 
-  for idx, score in enumerate(scores):
-    prob = np.mean(scores <= score)
-    w[idx] = np.random.binomial(n=1, p=prob)
-
-  # results = np.zeros((num_applicants,))
-  # for i, _idx in enumerate(sort_idx):
-  #   prob = (float(i) / num_applicants) # percentile of this student.
-  #   results[_idx] = np.random.binomial(n=1, p=prob)
+  else:
+    w = np.ones_like(scores)
 
   return z,x,y,EW,theta,theta_star, w, scores
 
 # %%
-def test_params(num_applicants, x, y, theta, theta_star):
+def test_params(num_applicants, x, y, w, theta, theta_star):
   # inputs:  num_applicants = number of applicants (time horizon T), 
   #          EW = expected effort conversion matrix E[W],
   #          theta_star = true causal effects theta* (set to [0,0.5] by default)
@@ -164,22 +163,23 @@ def test_params(num_applicants, x, y, theta, theta_star):
     return theta_hat_tsls_
 
   # shuffle the samples so types show up randomly
-  [x_shuffle,y_shuffle,theta_shuffle] = [x.copy(),y.copy(),theta.copy()]
+  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
   shuffle_iter = list(range(len(x)))
   np.random.shuffle(shuffle_iter)
 
-  # TODO: maybe vectorize this?
   j = 0
   for k in shuffle_iter:
     x_shuffle[j] = x[k]
     y_shuffle[j] = y[k]
     theta_shuffle[j] = theta[k]
+    w_shuffle[j] = w[k]
     j+=1
 
   i=0
   # save estimates and errors for every even round 
   estimates_list = np.zeros([int((num_applicants/2)),2,2])
   error_list = np.zeros([int((num_applicants)/2),2])
+
   for t in tqdm(range(10,num_applicants,2), leave=False):
     # centering
     #y_mean = np.mean(y_shuffle[:t])
@@ -233,20 +233,13 @@ error_list_mean = np.zeros((epochs,half,2))
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, scores = generate_data(num_applicants=T)
+  z,x,y,EW, theta, theta_star, w, scores = generate_data(num_applicants=T, admit_all=args.admit_all)
   
   # plot data.
   plot_data(y, w, 'dataset_y.png')
   plot_data(scores, w, 'dataset_scores.png')
-  # fig,ax=plt.subplots()
-  # ax.hist(y, bins='auto', color='green', label='all',  histtype='step')
-  # ax.hist(y[w==0], bins='auto', color='red', label='rejected',  histtype='step')
-  # ax.hist(y[w==1], bins='auto', color='blue', label='accepted',  histtype='step')
-  # ax.legend()
-  # plt.savefig(os.path.join(dirname, 'dataset.png'))
-  # # plot data end
 
-  [estimates_list, error_list] = test_params(T, x, y, theta, theta_star)
+  [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star)
   estimates_list_mean[i,:] = estimates_list
   error_list_mean[i,:] = error_list
 
