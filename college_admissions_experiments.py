@@ -86,7 +86,7 @@ def generate_data(num_applicants):
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
   for i in range(num_applicants):
-    x[i] = z[i] + np.matmul(EW,theta[i]) # optimal solution
+    x[i] = z[i] + np.matmul(EW.dot(EW.T),theta[i]) # optimal solution
 
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
@@ -109,7 +109,7 @@ def generate_data(num_applicants):
   #   prob = (float(i) / num_applicants) # percentile of this student.
   #   results[_idx] = np.random.binomial(n=1, p=prob)
 
-  return z,x,y,EW,theta,theta_star, w
+  return z,x,y,EW,theta,theta_star, w, scores
 
 # %%
 def test_params(num_applicants, x, y, theta, theta_star):
@@ -199,6 +199,15 @@ def test_params(num_applicants, x, y, theta, theta_star):
 
   return [estimates_list, error_list]
 
+#%%
+def plot_data(data, condition, name='dataset.png'):
+  fig,ax=plt.subplots()
+  ax.hist(data, bins='auto', color='green', label='all',  histtype='step')
+  ax.hist(data[condition==0], bins='auto', color='red', label='rejected',  histtype='step')
+  ax.hist(data[condition==1], bins='auto', color='blue', label='accepted',  histtype='step')
+  ax.legend()
+  plt.savefig(os.path.join(dirname, name))
+
 # %% 
 import pickle as pkl
 import time
@@ -224,16 +233,18 @@ error_list_mean = np.zeros((epochs,half,2))
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, results = generate_data(num_applicants=T)
+  z,x,y,EW, theta, theta_star, w, scores = generate_data(num_applicants=T)
   
   # plot data.
-  fig,ax=plt.subplots()
-  ax.hist(y, bins='auto', color='green', label='all',  histtype='step')
-  ax.hist(y[results==0], bins='auto', color='red', label='rejected',  histtype='step')
-  ax.hist(y[results==1], bins='auto', color='blue', label='accepted',  histtype='step')
-  ax.legend()
-  plt.savefig(os.path.join(dirname, 'dataset.png'))
-  # plot data end
+  plot_data(y, w, 'dataset_y.png')
+  plot_data(scores, w, 'dataset_scores.png')
+  # fig,ax=plt.subplots()
+  # ax.hist(y, bins='auto', color='green', label='all',  histtype='step')
+  # ax.hist(y[w==0], bins='auto', color='red', label='rejected',  histtype='step')
+  # ax.hist(y[w==1], bins='auto', color='blue', label='accepted',  histtype='step')
+  # ax.legend()
+  # plt.savefig(os.path.join(dirname, 'dataset.png'))
+  # # plot data end
 
   [estimates_list, error_list] = test_params(T, x, y, theta, theta_star)
   estimates_list_mean[i,:] = estimates_list
