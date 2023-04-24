@@ -181,14 +181,17 @@ def test_params(num_applicants, x, y, w, theta, theta_star):
   error_list = np.zeros([int((num_applicants)/2),2])
 
   for t in tqdm(range(10,num_applicants,2), leave=False):
-    # centering
-    #y_mean = np.mean(y_shuffle[:t])
-    #x_mean = np.mean(x_shuffle[:t],axis=0)
-
-    # estimates
+    # filtering out rejected students
     x_round = x_shuffle[:t]
     y_round = y_shuffle[:t]
     theta_round = theta_shuffle[:t]
+    w_round = w_shuffle[:t]
+
+    x_round = x_round[w_round==1]
+    y_round = y_round[w_round==1]
+    theta_round = theta_round[w_round==1] # TOASK:limit access to theta as well? 
+
+    # estimates
     ols_estimate = ols(x_round, y_round) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round, y_round, theta_round) # 2sls w/ intercept estimate
     estimates_list[i,:] += [ols_estimate,tsls_estimate]
