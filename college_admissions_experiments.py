@@ -134,22 +134,22 @@ def test_params(num_applicants, x, y, w, theta, theta_star):
   #          4) 2SLS estimate by regressing x onto theta, then theta onto y (w/ intercept estimate)
 
 
-  def ols(x,y,T):
+  def ols(x,y):
     model = LinearRegression(fit_intercept=True)
-    model.fit(x[:T], y[:T])
+    model.fit(x, y)
     theta_hat_ols_ = model.coef_
     return theta_hat_ols_
     
-  def tsls(x,y,theta,T): # runs until round T
+  def tsls(x,y,theta): # runs until round T
     # my implementation
     # regress x onto theta: estimate omega
     model = LinearRegression()
-    model.fit(theta[:T], x[:T])
+    model.fit(theta, x)
     omega_hat_ = model.coef_.T
 
     # regress y onto theta: estimate lambda
     model = LinearRegression()
-    model.fit(theta[:T], y[:T])
+    model.fit(theta, y)
     lambda_hat_ = model.coef_ 
 
     # estimate theta^* 
@@ -186,8 +186,11 @@ def test_params(num_applicants, x, y, w, theta, theta_star):
     #x_mean = np.mean(x_shuffle[:t],axis=0)
 
     # estimates
-    ols_estimate = ols(x_shuffle, y_shuffle, t) # ols w/ intercept estimate
-    tsls_estimate = tsls(x_shuffle, y_shuffle, theta_shuffle, t) # 2sls w/ intercept estimate
+    x_round = x_shuffle[:t]
+    y_round = y_shuffle[:t]
+    theta_round = theta_shuffle[:t]
+    ols_estimate = ols(x_round, y_round) # ols w/ intercept estimate
+    tsls_estimate = tsls(x_round, y_round, theta_round) # 2sls w/ intercept estimate
     estimates_list[i,:] += [ols_estimate,tsls_estimate]
 
     # errors
