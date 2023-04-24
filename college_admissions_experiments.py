@@ -9,6 +9,11 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from sklearn.linear_model import LinearRegression
 
+#%%
+from types import SimpleNamespace
+# for notebook. 
+args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True)
+
 # %%
 import argparse
 parser = argparse.ArgumentParser()
@@ -92,16 +97,19 @@ def generate_data(num_applicants):
   # our setup addition 
   # computing admission results.
   assert x.shape == theta.shape
-  score = (x * theta).sum(axis=-1)
+  scores = (x * theta).sum(axis=-1)
+  w = np.zeros_like(scores)
 
-  sort_idx = np.argsort(score)
-  
-  results = np.zeros((num_applicants,))
-  for i, _idx in enumerate(sort_idx):
-    prob = (float(i) / num_applicants) # percentile of this student.
-    results[_idx] = np.random.binomial(n=1, p=prob)
+  for idx, score in enumerate(scores):
+    prob = np.mean(scores <= score)
+    w[idx] = np.random.binomial(n=1, p=prob)
 
-  return z,x,y,EW,theta,theta_star, results
+  # results = np.zeros((num_applicants,))
+  # for i, _idx in enumerate(sort_idx):
+  #   prob = (float(i) / num_applicants) # percentile of this student.
+  #   results[_idx] = np.random.binomial(n=1, p=prob)
+
+  return z,x,y,EW,theta,theta_star, w
 
 # %%
 def test_params(num_applicants, x, y, theta, theta_star):
@@ -191,27 +199,7 @@ def test_params(num_applicants, x, y, theta, theta_star):
 
   return [estimates_list, error_list]
 
-# %%
-#@title
-# set T > 10 & in units of 5s for nice plots later 
-T = args.num_applicants
-epochs = args.num_repeat
-half = int(T/2)
-
-estimates_list_mean = np.zeros((epochs,half,2,2))
-error_list_mean = np.zeros((epochs,half,2))
-
-#estimates_list_mean = list()
-#error_list_mean = list()
-
-for i in tqdm(range(epochs)):
-  np.random.seed(i)
-  z,x,y,EW, theta, theta_star, results = generate_data(num_applicants=T)
-  [estimates_list, error_list] = test_params(T, x, y, theta, theta_star)
-  estimates_list_mean[i,:] = estimates_list
-  error_list_mean[i,:] = error_list
-
-# %%
+# %% 
 import pickle as pkl
 import time
 timestr = time.strftime('%Y%m%d-%H%H%S')
@@ -225,6 +213,33 @@ else:
     shutil.rmtree(dirname)
   
 os.makedirs(dirname)
+# %%
+T = args.num_applicants
+epochs = args.num_repeat
+half = int(T/2)
+
+estimates_list_mean = np.zeros((epochs,half,2,2))
+error_list_mean = np.zeros((epochs,half,2))
+
+#%%
+for i in tqdm(range(epochs)):
+  np.random.seed(i)
+  z,x,y,EW, theta, theta_star, results = generate_data(num_applicants=T)
+  
+  # plot data.
+  fig,ax=plt.subplots()
+  ax.hist(y, bins='auto', color='green', label='all',  histtype='step')
+  ax.hist(y[results==0], bins='auto', color='red', label='rejected',  histtype='step')
+  ax.hist(y[results==1], bins='auto', color='blue', label='accepted',  histtype='step')
+  ax.legend()
+  plt.savefig(os.path.join(dirname, 'dataset.png'))
+  # plot data end
+
+  [estimates_list, error_list] = test_params(T, x, y, theta, theta_star)
+  estimates_list_mean[i,:] = estimates_list
+  error_list_mean[i,:] = error_list
+
+# %%
 
 
 filename = os.path.join(dirname, "data")
