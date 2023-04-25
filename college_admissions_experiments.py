@@ -79,7 +79,7 @@ def generate_data(num_applicants, admit_all):
   g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
 
   # assessment rule 
-  theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 1]],num_applicants)
+  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],num_applicants)
 
   # effort conversion matrices
   EW = np.matrix([[10.0,0],[0,1.0]])
@@ -98,17 +98,19 @@ def generate_data(num_applicants, admit_all):
   # our setup addition 
   # computing admission results.
   assert x.shape == theta.shape
-  scores = (x * theta).sum(axis=-1)
+  x_ = x.copy()
+  x_[:,0] = (x[:,0] - 400 ) / 300
+  y_hat = (x_ * theta).sum(axis=-1)
   if not admit_all:
-    w = np.zeros_like(scores)
-    for idx, score in enumerate(scores):
-      prob = np.mean(scores <= score)
+    w = np.zeros_like(y_hat)
+    for idx, _y_hat in enumerate(y_hat):
+      prob = np.mean(y_hat <= _y_hat)
       w[idx] = np.random.binomial(n=1, p=prob)
 
   else:
-    w = np.ones_like(scores)
+    w = np.ones_like(y_hat)
 
-  return z,x,y,EW,theta,theta_star, w, scores
+  return z,x,y,EW,theta,theta_star, w, y_hat
 
 # %%
 def test_params(num_applicants, x, y, w, theta, theta_star):
@@ -213,6 +215,7 @@ def plot_data(data, condition, name='dataset.png'):
   ax.hist(data[condition==1], bins='auto', color='blue', label='accepted',  histtype='step')
   ax.legend()
   plt.savefig(os.path.join(dirname, name))
+  plt.close()
 
 # %% 
 import pickle as pkl
@@ -235,22 +238,28 @@ half = int(T/2)
 
 estimates_list_mean = np.zeros((epochs,half,2,2))
 error_list_mean = np.zeros((epochs,half,2))
+estimates_list_mean = []
+error_list_mean = []
 
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, scores = generate_data(num_applicants=T, admit_all=args.admit_all)
+  z,x,y,EW, theta, theta_star, w, y_hat = generate_data(num_applicants=T, admit_all=args.admit_all)
   
   # plot data.
   plot_data(y, w, 'dataset_y.png')
-  plot_data(scores, w, 'dataset_scores.png')
+  plot_data(y_hat, w, 'dataset_y_hat.png')
 
-  [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star)
-  estimates_list_mean[i,:] = estimates_list
-  error_list_mean[i,:] = error_list
+  try:
+    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star)
+    estimates_list_mean.append(estimates_list[np.newaxis])
+    error_list_mean.append(error_list[np.newaxis])
+  except np.linalg.LinAlgError:
+    pass # record nothing in case the algorithm fails.  
 
 # %%
-
+estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
+error_list_mean = np.concatenate(error_list_mean,axis=0)
 
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
@@ -381,6 +390,7 @@ def plot_features():
 
   fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
   plt.savefig(fname, dpi=500)
+  plt.close()
 
 # plt.show()
 
@@ -412,6 +422,7 @@ def plot_error_estimate():
 
   fname = os.path.join(dirname, 'error_estimation.png')
   plt.savefig(fname, dpi=500, bbox_inches='tight')
+  plt.close()
   # plt.show()
 
 
@@ -447,6 +458,7 @@ def plot_outcome():
 
   fname = os.path.join(dirname, 'all_outcome.png')
   plt.savefig(fname, dpi=500, bbox_inches='tight')
+  plt.close()
   # plt.show()
 
 plot_features()
