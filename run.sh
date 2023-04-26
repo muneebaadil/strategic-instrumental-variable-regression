@@ -1,0 +1,2 @@
+python college_admissions_experiments.py --num-applicants 10000 --num-repeat 10 --experiment-name with-selection
+python college_admissions_experiments.py --num-applicants 10000 --num-repeat 10 --experiment-name without-selection --admit-all 
