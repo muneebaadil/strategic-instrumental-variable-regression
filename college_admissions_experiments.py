@@ -1,5 +1,6 @@
 # %%
 import os
+import subprocess
 from time import time 
 from tqdm import tqdm
 import pandas as pd
@@ -14,6 +15,9 @@ from types import SimpleNamespace
 # for notebook. 
 args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True, admit_all=False)
 
+def get_git_revision_hash() -> str:
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+
 # %%
 import argparse
 parser = argparse.ArgumentParser()
@@ -21,6 +25,7 @@ parser.add_argument('--num-applicants', default=5000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
+parser.add_argument('--experiment-name', type=str)
 args = parser.parse_args()
 
 
@@ -220,10 +225,10 @@ def plot_data(data, condition, name='dataset.png'):
 # %% 
 import pickle as pkl
 import time
-timestr = time.strftime('%Y%m%d-%H%H%S')
+experiment_name = time.strftime('%Y%m%d-%H%H%S') if args.experiment_name is None else args.experiment_name
 
 if not args.test_run:
-  dirname = os.path.join('experiments', f'{timestr}')
+  dirname = os.path.join('experiments', f'{experiment_name}')
 else:
   dirname = os.path.join('experiments',f'test-run')
   if os.path.exists(dirname):
@@ -231,6 +236,10 @@ else:
     shutil.rmtree(dirname)
   
 os.makedirs(dirname)
+git_hash = get_git_revision_hash()
+with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
+  f.write(git_hash)
+  
 # %%
 T = args.num_applicants
 epochs = args.num_repeat
