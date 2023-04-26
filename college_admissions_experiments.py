@@ -28,31 +28,6 @@ parser.add_argument('--admit-all', action='store_true', help='admit all students
 parser.add_argument('--experiment-name', type=str)
 args = parser.parse_args()
 
-
- # %%
-# ### First, estimate theta*, true causal effect of (SAT, HS GPA) on college GPA
-# ## based on real data from 1000 students
-# df = pd.read_csv("clean_gpa.csv")
-
-# x_real = df[['new_sat','new_gpa']].to_numpy()
-# y_real = df['college_gpa'].to_numpy()
-
-# ## find true causal effects theta*
-# # ordinary least squares (ols)
-# x_tilde = np.hstack((x_real,np.ones((len(x_real),1)))) # add 1 for intercept
-
-# m = x_real.shape[1]
-# x_sum = np.zeros([m+1,m+1])
-# xy_sum = np.zeros(m+1)
-
-# for i in range(len(x_real)):
-#   x_sum += np.outer(x_tilde[i],x_tilde[i])
-#   xy_sum += x_tilde[i]*y_real[i]
-
-# theta_star = np.matmul(np.linalg.inv(x_sum),xy_sum)[:-1]
-
-# set theta* to nice values for synthetic data
-# 1st entry in theta* is for SAT score, 2nd is for HSGPA
 theta_star = np.array([0,0.5])
 # %%
 def generate_data(num_applicants, admit_all):
