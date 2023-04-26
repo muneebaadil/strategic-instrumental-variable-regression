@@ -264,7 +264,12 @@ error_list_mean = np.concatenate(error_list_mean,axis=0)
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
 with open(filename, 'wb') as f:
-    pkl.dump((estimates_list_mean, error_list_mean, y,x,z,theta,EW,theta_star), f)
+    save = {
+      'estimates_list_mean': estimates_list_mean, 
+      'error_list_mean': error_list_mean,
+      'y': y, 'x': x, 'z': z,  'EW':EW, 'theta':theta, 'theta_star': theta_star, 'w': w, 'y_hat':y_hat
+    }
+    pkl.dump(save, f)
 
 # %%
 # # save to file
