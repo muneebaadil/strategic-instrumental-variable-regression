@@ -21,7 +21,7 @@ def get_git_revision_hash() -> str:
 # %%
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--num-applicants', default=5000, type=int)
+parser.add_argument('--num-applicants', default=10000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
