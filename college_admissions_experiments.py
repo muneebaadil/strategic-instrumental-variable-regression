@@ -1,4 +1,5 @@
 # %%
+import sys
 import os
 import subprocess
 from time import time 
@@ -235,6 +236,8 @@ os.makedirs(dirname)
 git_hash = get_git_revision_hash()
 with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
   f.write(git_hash)
+  f.write('\n')
+  f.write(' '.join(sys.argv))
   
 # %%
 T = args.num_applicants
@@ -405,20 +408,14 @@ def plot_outcome():
   fig,ax=plt.subplots()
   plt.hist(y,bins='auto',label='combined')
   plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
-  plt.axvline(x=np.mean(y), linestyle='-', color = 'blue', linewidth = 4)
-  plt.axvline(x=np.mean(y), linestyle='--', color = 'white', linewidth = 4)
 
   # disadvantaged
-  plt.hist(y[0:half],bins='auto',label='disadvantaged', alpha=.85)
-  plt.axvline(x=np.mean(y[0:half]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
-  plt.axvline(x=np.mean(y[0:half]), linestyle='-', color = 'orange', linewidth = 4)
-  plt.axvline(x=np.mean(y[0:half]), linestyle='--', color = 'white', linewidth = 4)
+  plt.hist(y[disadv_idx],bins='auto',label='disadvantaged', alpha=.85)
+  plt.axvline(x=np.mean(y[disadv_idx]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
 
   # advantaged
-  plt.hist(y[half:],bins='auto',label='advantaged', alpha=0.7)
-  plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
-  plt.axvline(x=np.mean(y[half:]),color='green',linestyle='-', linewidth = 4)
-  plt.axvline(x=np.mean(y[half:]), linestyle='--', color = 'white', linewidth = 4)
+  plt.hist(y[adv_idx],bins='auto',label='advantaged', alpha=0.7)
+  plt.axvline(x=np.mean(y[adv_idx]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
 
   plt.xlim(0,4)
   plt.xticks(fontsize=14)
