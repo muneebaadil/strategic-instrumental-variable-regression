@@ -26,11 +26,12 @@ parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 parser.add_argument('--experiment-name', type=str)
+parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
 # %%
-def generate_data(num_applicants, admit_all):
+def generate_data(num_applicants, admit_all, applicants_per_round):
   half = int(num_applicants/2) 
   m = theta_star.size
 
@@ -59,7 +60,13 @@ def generate_data(num_applicants, admit_all):
   g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
 
   # assessment rule 
-  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],num_applicants)
+  assert num_applicants % applicants_per_round == 0
+  n_rounds = int(num_applicants / applicants_per_round)
+  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+
+  # theta repeating over the rounds.
+  theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
+  assert theta.shape[0] == num_applicants
 
   # effort conversion matrices
   EW = np.matrix([[10.0,0],[0,1.0]])
@@ -78,15 +85,21 @@ def generate_data(num_applicants, admit_all):
   # our setup addition 
   # computing admission results.
   assert x.shape == theta.shape
+  y_hat = (x * theta).sum(axis=-1)
   x_ = x.copy()
-  x_[:,0] = (x[:,0] - 400 ) / 300
+  x_[:,0] = (x_[:,0] - 400) / 300
   y_hat = (x_ * theta).sum(axis=-1)
   if not admit_all:
     w = np.zeros_like(y_hat)
-    for idx, _y_hat in enumerate(y_hat):
-      prob = np.mean(y_hat <= _y_hat)
-      w[idx] = np.random.binomial(n=1, p=prob)
-
+    i = 0
+    # comparing people coming in the same rounds. 
+    for r in range(n_rounds):
+      y_hat_r = y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
+  
+      for _y_hat_r in y_hat_r:
+        prob = np.mean(y_hat_r <= _y_hat_r)
+        w[i] = np.random.binomial(n=1, p=prob)
+        i += 1
   else:
     w = np.ones_like(y_hat)
 
@@ -228,7 +241,7 @@ error_list_mean = []
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, y_hat = generate_data(num_applicants=T, admit_all=args.admit_all)
+  z,x,y,EW, theta, theta_star, w, y_hat = generate_data(num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round)
   
   # plot data.
   plot_data(y, w, 'dataset_y.png')
@@ -255,16 +268,6 @@ with open(filename, 'wb') as f:
     }
     pkl.dump(save, f)
 
-# %%
-# # save to file
-# y.tofile("saved_y_list")
-# x.tofile("saved_x_list")
-# z.tofile("saved_z_list")
-# np.array(WWT).tofile("saved_WWT_list")
-# # EWWT.tofile("saved_EWWT")
-# theta_star.tofile("saved_theta_star")
-# estimates_list_mean.tofile("saved_estimates_list_mean")
-# error_list_mean.tofile("saved_error_list_mean")
 # %%
 def plot_features():
   ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
@@ -398,6 +401,7 @@ def plot_error_estimate():
   plt.ylim(0,.25)
   plt.xticks(fontsize=14)
   plt.yticks(fontsize=14)
+  # plt.yscale('log')
   plt.xlim(50,T-11)
 
   plt.xlabel('Number of applicants (rounds)', fontsize=14)
