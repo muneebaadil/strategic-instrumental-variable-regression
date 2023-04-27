@@ -277,16 +277,12 @@ def plot_features():
   ax1.hist(x[0:half,1],bins='auto', label='after manipulation', color='darkorange')
 
   ax1.axvline(x=np.mean(x[0:half,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
-  ax1.axvline(x=np.mean(x[0:half,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
-  ax1.axvline(x=np.mean(x[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
-
+  
   ax1.set_title("observable high school GPA (x1)")
   ax1.set(ylabel='Number of applicants')
 
   ax1.hist(z[0:half,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
   ax1.axvline(x=np.mean(z[0:half,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
-  ax1.axvline(x=np.mean(z[0:half,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-  ax1.axvline(x=np.mean(z[0:half,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
   ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
   ax1.set_xlim(0,4)
@@ -299,18 +295,11 @@ def plot_features():
 
   ### 2) first-gen SAT
   ax2.hist(x[0:half,0], bins='auto', label='after manipulation', color='orange')
-  ax2.axvline(x=np.mean(x[0:half,0]),color='blue',)
   ax2.axvline(x=np.mean(x[0:half,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
-  ax2.axvline(x=np.mean(x[0:half,0]), linestyle='-', color = 'red', linewidth = 4) # after mean
-  ax2.axvline(x=np.mean(x[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # after mean
 
   ax2.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
-
   ax2.hist(z[0:half,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
-
   ax2.axvline(x=np.mean(z[0:half,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax2.axvline(x=np.mean(z[0:half,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-  ax2.axvline(x=np.mean(z[0:half,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
   ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
   ax2.set_xlim(400,1600)
@@ -324,16 +313,9 @@ def plot_features():
 
   ### 3) non-first-gen HS GPA
   ax3.hist(x[half:,1],bins='auto', label='after manipulation', color='green')
-
   ax3.hist(z[half:,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-
   ax3.axvline(x=np.mean(z[half:,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax3.axvline(x=np.mean(z[half:,1]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-  ax3.axvline(x=np.mean(z[half:,1]), linestyle='--', color = 'white', linewidth = 4) # before mean
-
   ax3.axvline(x=np.mean(x[half:,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
-  ax3.axvline(x=np.mean(x[half:,1]), linestyle='-', color = 'red', linewidth = 4) # after mean
-  ax3.axvline(x=np.mean(x[half:,1]), linestyle='--', color = 'white', linewidth = 4) # after mean
 
   ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
   ax3.set_xlim(0,4)
@@ -341,22 +323,13 @@ def plot_features():
   ax3.set_ylabel('Number of applicants',fontsize=14)
   ax3.tick_params(axis="x", labelsize=14)
   ax3.tick_params(axis="y", labelsize=14)
-
   ax3.legend()
-
 
   ### 4) non-first-gen SAT
   ax4.hist(x[half:,0], bins='auto', label='after manipulation', color='green')
-
   ax4.hist(z[half:,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-
   ax4.axvline(x=np.mean(z[half:,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax4.axvline(x=np.mean(z[half:,0]), linestyle='-', color = 'blue', linewidth = 4) # before mean
-  ax4.axvline(x=np.mean(z[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
-
   ax4.axvline(x=np.mean(x[half:,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
-  ax4.axvline(x=np.mean(x[half:,0]), linestyle='-', color = 'red', linewidth = 4) # before mean
-  ax4.axvline(x=np.mean(x[half:,0]), linestyle='--', color = 'white', linewidth = 4) # before mean
 
   ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
   ax4.set_xlim(400,1600)
