@@ -43,20 +43,26 @@ def generate_data(num_applicants, admit_all, applicants_per_round):
   # initial features (z)
   z = np.zeros([num_applicants,m])
 
+  # indices for shuffling
+  idx = np.arange(num_applicants)
+  np.random.shuffle(idx)
+  disadv_idx = idx[:half]
+  adv_idx = idx[half:]
+
   # disadvantaged students
-  z[0:half,0] = np.random.normal(mean_sat-100,sigma_sat,z[0:half,0].shape) #SAT
-  z[0:half,1] = np.random.normal(mean_gpa-.2,sigma_gpa,z[0:half,1].shape) #GPA
+  z[disadv_idx,0] = np.random.normal(mean_sat-100,sigma_sat,z[disadv_idx][:,0].shape) #SAT
+  z[disadv_idx,1] = np.random.normal(mean_gpa-.2,sigma_gpa,z[disadv_idx][:,1].shape) #GPA
 
   # advantaged students
-  z[half:,0] = np.random.normal(mean_sat+100,sigma_sat,z[0:half,0].shape) #SAT
-  z[half:,1] = z[half:,1] + np.random.normal(mean_gpa+.2,sigma_gpa,z[half:,1].shape) #GPA
+  z[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,z[adv_idx][:,0].shape) #SAT
+  z[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,z[adv_idx][:,1].shape) #GPA
 
   z[:,0] = np.clip(z[:,0],400,1600) # clip to 400 to 1600
   z[:,1] = np.clip(z[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
   g = np.ones(num_applicants)*0.5 # legacy students shifted up
-  g[0:half]=-0.5 # first-gen students shifted down
+  g[disadv_idx]=-0.5 # first-gen students shifted down
   g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
 
   # assessment rule 
@@ -103,7 +109,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round):
   else:
     w = np.ones_like(y_hat)
 
-  return z,x,y,EW,theta,theta_star, w, y_hat
+  return z,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
 
 # %%
 def test_params(num_applicants, x, y, w, theta, theta_star):
@@ -157,18 +163,20 @@ def test_params(num_applicants, x, y, w, theta, theta_star):
     # assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
     return theta_hat_tsls_
 
-  # shuffle the samples so types show up randomly
-  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
-  shuffle_iter = list(range(len(x)))
-  np.random.shuffle(shuffle_iter)
+  # # shuffle the samples so types show up randomly
+  # [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
+  # shuffle_iter = list(range(len(x)))
+  # np.random.shuffle(shuffle_iter)
 
-  j = 0
-  for k in shuffle_iter:
-    x_shuffle[j] = x[k]
-    y_shuffle[j] = y[k]
-    theta_shuffle[j] = theta[k]
-    w_shuffle[j] = w[k]
-    j+=1
+  # j = 0
+  # for k in shuffle_iter:
+  #   x_shuffle[j] = x[k]
+  #   y_shuffle[j] = y[k]
+  #   theta_shuffle[j] = theta[k]
+  #   w_shuffle[j] = w[k]
+  #   j+=1
+
+  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
   i=0
   # save estimates and errors for every even round 
@@ -241,7 +249,7 @@ error_list_mean = []
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, y_hat = generate_data(num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round)
+  z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round)
   
   # plot data.
   plot_data(y, w, 'dataset_y.png')
@@ -274,15 +282,15 @@ def plot_features():
   fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
 
   ### first-gen HS GPA
-  ax1.hist(x[0:half,1],bins='auto', label='after manipulation', color='darkorange')
+  ax1.hist(x[disadv_idx,1],bins='auto', label='after manipulation', color='darkorange')
 
-  ax1.axvline(x=np.mean(x[0:half,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
-  
+  ax1.axvline(x=np.mean(x[disadv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
+
   ax1.set_title("observable high school GPA (x1)")
   ax1.set(ylabel='Number of applicants')
 
-  ax1.hist(z[0:half,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
-  ax1.axvline(x=np.mean(z[0:half,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
+  ax1.hist(z[disadv_idx,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax1.axvline(x=np.mean(z[disadv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
 
   ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
   ax1.set_xlim(0,4)
@@ -294,12 +302,12 @@ def plot_features():
   ax1.legend()
 
   ### 2) first-gen SAT
-  ax2.hist(x[0:half,0], bins='auto', label='after manipulation', color='orange')
-  ax2.axvline(x=np.mean(x[0:half,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
+  ax2.hist(x[disadv_idx,0], bins='auto', label='after manipulation', color='orange')
+  ax2.axvline(x=np.mean(x[disadv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
 
   ax2.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
-  ax2.hist(z[0:half,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
-  ax2.axvline(x=np.mean(z[0:half,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax2.hist(z[disadv_idx,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax2.axvline(x=np.mean(z[disadv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
 
   ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
   ax2.set_xlim(400,1600)
@@ -312,10 +320,10 @@ def plot_features():
   ax2.legend()
 
   ### 3) non-first-gen HS GPA
-  ax3.hist(x[half:,1],bins='auto', label='after manipulation', color='green')
-  ax3.hist(z[half:,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-  ax3.axvline(x=np.mean(z[half:,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax3.axvline(x=np.mean(x[half:,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
+  ax3.hist(x[adv_idx,1],bins='auto', label='after manipulation', color='green')
+  ax3.hist(z[adv_idx,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax3.axvline(x=np.mean(z[adv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax3.axvline(x=np.mean(x[adv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
 
   ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
   ax3.set_xlim(0,4)
@@ -326,10 +334,10 @@ def plot_features():
   ax3.legend()
 
   ### 4) non-first-gen SAT
-  ax4.hist(x[half:,0], bins='auto', label='after manipulation', color='green')
-  ax4.hist(z[half:,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-  ax4.axvline(x=np.mean(z[half:,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax4.axvline(x=np.mean(x[half:,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
+  ax4.hist(x[adv_idx,0], bins='auto', label='after manipulation', color='green')
+  ax4.hist(z[adv_idx,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax4.axvline(x=np.mean(z[adv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax4.axvline(x=np.mean(x[adv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
 
   ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
   ax4.set_xlim(400,1600)
