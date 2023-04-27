@@ -113,7 +113,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round):
   return z,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
 
 # %%
-def test_params(num_applicants, x, y, w, theta, theta_star):
+def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
   # inputs:  num_applicants = number of applicants (time horizon T), 
   #          EW = expected effort conversion matrix E[W],
   #          theta_star = true causal effects theta* (set to [0,0.5] by default)
@@ -164,27 +164,14 @@ def test_params(num_applicants, x, y, w, theta, theta_star):
     # assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
     return theta_hat_tsls_
 
-  # # shuffle the samples so types show up randomly
-  # [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
-  # shuffle_iter = list(range(len(x)))
-  # np.random.shuffle(shuffle_iter)
-
-  # j = 0
-  # for k in shuffle_iter:
-  #   x_shuffle[j] = x[k]
-  #   y_shuffle[j] = y[k]
-  #   theta_shuffle[j] = theta[k]
-  #   w_shuffle[j] = w[k]
-  #   j+=1
-
   [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
-  i=0
-  # save estimates and errors for every even round 
-  estimates_list = np.zeros([int((num_applicants/2)),2,2])
-  error_list = np.zeros([int((num_applicants)/2),2])
+  upp_limits = range(applicants_per_round*2,num_applicants+1,2)
+  estimates_list = np.zeros([len(upp_limits),2,2])
+  error_list = np.zeros([len(upp_limits),2])
 
-  for t in tqdm(range(10,num_applicants,2), leave=False):
+  i=0
+  for t in tqdm(upp_limits, leave=False):
     # filtering out rejected students
     x_round = x_shuffle[:t]
     y_round = y_shuffle[:t]
@@ -258,12 +245,13 @@ for i in tqdm(range(epochs)):
   plot_data(y, w, 'dataset_y.png')
   plot_data(y_hat, w, 'dataset_y_hat.png')
 
-  try:
-    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star)
-    estimates_list_mean.append(estimates_list[np.newaxis])
-    error_list_mean.append(error_list[np.newaxis])
-  except np.linalg.LinAlgError:
-    pass # record nothing in case the algorithm fails.  
+  [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
+  estimates_list_mean.append(estimates_list[np.newaxis])
+  error_list_mean.append(error_list[np.newaxis])
+
+  # try:
+  # except np.linalg.LinAlgError:
+  #   pass # record nothing in case the algorithm fails.  
 
 # %%
 estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
@@ -378,15 +366,15 @@ def plot_error_estimate():
   ticks.insert(0,1)
 
   # plot error of OLS vs 2SLS with error bar
-  plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
+  plt.errorbar(list(range(args.applicants_per_round*2,T+1,2)), np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
               color='darkorange', ecolor='wheat', label='OLS',elinewidth=10)
-  plt.errorbar(list(range(2,T+1,2)), np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
+  plt.errorbar(list(range(args.applicants_per_round*2,T+1,2)), np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
               color='darkblue', ecolor='lightblue', label='2SLS',elinewidth=10)
   plt.ylim(0,.25)
   plt.xticks(fontsize=14)
   plt.yticks(fontsize=14)
   # plt.yscale('log')
-  plt.xlim(50,T-11)
+  # plt.xlim(50,T-11)
 
   plt.xlabel('Number of applicants (rounds)', fontsize=14)
   plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
