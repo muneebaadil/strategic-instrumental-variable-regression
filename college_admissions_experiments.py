@@ -26,9 +26,12 @@ parser.add_argument('--num-applicants', default=10000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
-parser.add_argument('--experiment-name', type=str)
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 parser.add_argument('--fixed-effort-conversion', action='store_true')
+
+# experiment
+parser.add_argument('--experiment-root', type=str)
+parser.add_argument('--experiment-name', type=str)
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
@@ -202,9 +205,9 @@ import time
 experiment_name = time.strftime('%Y%m%d-%H%H%S') if args.experiment_name is None else args.experiment_name
 
 if not args.test_run:
-  dirname = os.path.join('experiments', f'{experiment_name}')
+  dirname = os.path.join(args.experiment_root, f'{experiment_name}')
 else:
-  dirname = os.path.join('experiments',f'test-run')
+  dirname = os.path.join(args.experiment_root, f'test-run')
   if os.path.exists(dirname):
     import shutil
     shutil.rmtree(dirname)
