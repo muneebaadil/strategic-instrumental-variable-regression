@@ -28,11 +28,12 @@ parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 parser.add_argument('--experiment-name', type=str)
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
+parser.add_argument('--fixed-effort-conversion', action='store_true')
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
 # %%
-def generate_data(num_applicants, admit_all, applicants_per_round):
+def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
 
@@ -76,12 +77,27 @@ def generate_data(num_applicants, admit_all, applicants_per_round):
   assert theta.shape[0] == num_applicants
 
   # effort conversion matrices
-  EW = np.matrix([[10.0,0],[0,1.0]])
+  EW = np.array([[10.0,0],[0,1.0]])
+  EWi = np.zeros(shape=(num_applicants, 2, 2))
 
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
   for i in range(num_applicants):
-    x[i] = z[i] + np.matmul(EW.dot(EW.T),theta[i]) # optimal solution
+    # sample effort conversion matrix. 
+    EWi[i] = EW.copy()
+    if not fixed_effort_conversion: # add noise  per applicant.
+      # add noise
+      noise_mean = [0.5, 0, 0, 0.1]
+      noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
+
+      noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape((2,2))
+
+      if i in adv_idx:
+        EWi[i] += noise
+      else:
+        EWi[i] -= noise
+
+    x[i] = z[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
@@ -113,57 +129,31 @@ def generate_data(num_applicants, admit_all, applicants_per_round):
   return z,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
 
 # %%
+def ols(x,y):
+  model = LinearRegression(fit_intercept=True)
+  model.fit(x, y)
+  theta_hat_ols_ = model.coef_
+  return theta_hat_ols_
+  
+def tsls(x,y,theta): # runs until round T
+  # my implementation
+  # regress x onto theta: estimate omega
+  model = LinearRegression()
+  model.fit(theta, x)
+  omega_hat_ = model.coef_.T
+
+  # regress y onto theta: estimate lambda
+  model = LinearRegression()
+  model.fit(theta, y)
+  lambda_hat_ = model.coef_ 
+
+  # estimate theta^* 
+  theta_hat_tsls_ = np.matmul(
+    np.linalg.inv(omega_hat_), lambda_hat_
+  )
+  return theta_hat_tsls_
+
 def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
-  # inputs:  num_applicants = number of applicants (time horizon T), 
-  #          EW = expected effort conversion matrix E[W],
-  #          theta_star = true causal effects theta* (set to [0,0.5] by default)
-  #
-  # output:  synthetic data for num_applicants rounds, including:
-  #           z (unobserved, unmanipulated features), 
-  #           x (observed, manipulated features), y (outcome), 
-  #           theta (decision rule), and WWT (effort conversion matrix)
-  #           
-  #           estimate_list: OLS & 2SLS estimates @ rounds 10 to num_applicants
-  #           error_list: L2-norm of OLS & 2SLS estimates minus true theta*
-  #
-  # outline: 1) create synthetic unobserved data (z_t, W_tW_t^T, g_t), 
-  #             add confounding by splitting data into two types split 50/50,
-  #             (1st half disadvantaged, 2nd half advantaged), 
-  #             make z & WW^T worse for disadvantaged, better for advantaged
-  #             & set mean g lesser for disadvantaged, high for advantaged
-  #          2) set decision rule theta_t & solve for x_t and y_t based on model
-  #          3) OLS estimate by regressing x onto y (w/ intercept estimate)
-  #          4) 2SLS estimate by regressing x onto theta, then theta onto y (w/ intercept estimate)
-
-
-  def ols(x,y):
-    model = LinearRegression(fit_intercept=True)
-    model.fit(x, y)
-    theta_hat_ols_ = model.coef_
-    return theta_hat_ols_
-    
-  def tsls(x,y,theta): # runs until round T
-    # my implementation
-    # regress x onto theta: estimate omega
-    model = LinearRegression()
-    model.fit(theta, x)
-    omega_hat_ = model.coef_.T
-
-    # regress y onto theta: estimate lambda
-    model = LinearRegression()
-    model.fit(theta, y)
-    lambda_hat_ = model.coef_ 
-
-    # estimate theta^* 
-    theta_hat_tsls_ = np.matmul(
-      np.linalg.inv(omega_hat_), lambda_hat_
-    )
-    
-    # assert np.allclose(omega_hat_, omega_hat, rtol=0, atol=1e-5), f"ours: {omega_hat_}; theirs: {omega_hat}"
-    # assert np.allclose(lambda_hat_, lambda_hat, rtol=0, atol=1e-5), f"ours: {lambda_hat_}; theirs: {lambda_hat}"
-    # assert np.allclose(theta_hat_tsls_, theta_hat_tsls, rtol=0, atol=1e-5), f"ours: {theta_hat_tsls_}; theirs: {theta_hat_tsls}"
-    return theta_hat_tsls_
-
   [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
   upp_limits = range(applicants_per_round*2,num_applicants+1,2)
@@ -239,7 +229,10 @@ error_list_mean = []
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round)
+  z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(
+    num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+    fixed_effort_conversion=args.fixed_effort_conversion
+    )
   
   # plot data.
   plot_data(y, w, 'dataset_y.png')
