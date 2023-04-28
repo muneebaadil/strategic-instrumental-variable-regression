@@ -30,7 +30,7 @@ parser.add_argument('--applicants-per-round', default=1, type=int, help='used fo
 parser.add_argument('--fixed-effort-conversion', action='store_true')
 
 # experiment
-parser.add_argument('--experiment-root', type=str)
+parser.add_argument('--experiment-root', type=str, default='experiments')
 parser.add_argument('--experiment-name', type=str)
 args = parser.parse_args()
 
@@ -240,14 +240,12 @@ for i in tqdm(range(epochs)):
   # plot data.
   plot_data(y, w, 'dataset_y.png')
   plot_data(y_hat, w, 'dataset_y_hat.png')
-
-  [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
-  estimates_list_mean.append(estimates_list[np.newaxis])
-  error_list_mean.append(error_list[np.newaxis])
-
-  # try:
-  # except np.linalg.LinAlgError:
-  #   pass # record nothing in case the algorithm fails.  
+  try:
+    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
+    estimates_list_mean.append(estimates_list[np.newaxis])
+    error_list_mean.append(error_list[np.newaxis])
+  except np.linalg.LinAlgError:
+    pass # record nothing in case the algorithm fails.  
 
 # %%
 estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
