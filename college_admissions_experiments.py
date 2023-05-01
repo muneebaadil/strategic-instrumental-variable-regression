@@ -32,6 +32,9 @@ parser.add_argument('--fixed-effort-conversion', action='store_true')
 # experiment
 parser.add_argument('--experiment-root', type=str, default='experiments')
 parser.add_argument('--experiment-name', type=str)
+
+# temporary
+parser.add_argument('--generate', default=1, choices=[1,2], type=int)
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
@@ -58,8 +61,9 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
   mean_sat, mean_gpa = 900, 2
   sigma_sat, sigma_gpa = 200, 0.5
   EW = np.array([[10.0,0],[0,1.0]])
-
   total_applicants, accepted_applicants = 0, 0
+  b, x, y, theta, w, y_hat, adv_idx, disadv_idx = \
+    [], [], [], [], [], [], [], []
   while accepted_applicants < n_seen_applicants:
 
     # generate applicants b_t
@@ -67,10 +71,41 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
       applicants_per_round, mean_sat, mean_gpa, sigma_sat, sigma_gpa
       )
     
-    EWi = sample_effort_conversion(EW, applicants_per_round, adv_idxr, fixed_effort_conversion)
+    # effort conversion
+    EWir = sample_effort_conversion(EW, applicants_per_round, adv_idxr, fixed_effort_conversion)
 
+    # theta
+    thetar = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]], 1)
+    thetar = np.repeat(thetar, repeats=applicants_per_round, axis=0)
+    
+    # x_t
+    xr = compute_xt(EWir, br, thetar)
+    yr = np.clip(np.matmul(xr,theta_star) + gr,0,4) # clipped outcomes
 
+    assert xr.shape == thetar.shape
+    xr_ = xr.copy()
+    xr_[:,0] = (xr_[:,0] - 400) / 300
+    y_hatr = (xr_ * thetar).sum(axis=-1)
 
+    # selection
+    wr = np.ones((applicants_per_round,))
+
+    # update data for iteration
+    b.append(br); x.append(xr); y.append(yr); theta.append(thetar)
+    w.append(wr); y_hat.append(y_hatr)
+    adv_idx.append(adv_idxr + total_applicants) # offset 
+    disadv_idx.append(disadv_idxr + total_applicants) # offset
+
+    total_applicants += applicants_per_round
+    accepted_applicants += np.sum(wr)
+
+  b, x, y, theta, w, y_hat, adv_idx, disadv_idx = map(
+      lambda x: np.concatenate(x, axis=0),
+      (b, x, y, theta, w, y_hat, adv_idx, disadv_idx)
+      )
+  return b, x, y, EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx
+
+    
 
 
 def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
@@ -150,7 +185,6 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # our setup addition 
   # computing admission results.
   assert x.shape == theta.shape
-  y_hat = (x * theta).sum(axis=-1)
   x_ = x.copy()
   x_[:,0] = (x_[:,0] - 400) / 300
   y_hat = (x_ * theta).sum(axis=-1)
@@ -271,9 +305,15 @@ error_list_mean = []
 #%%
 for i in tqdm(range(epochs)):
   np.random.seed(i)
-  z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(
-    num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-    fixed_effort_conversion=args.fixed_effort_conversion
+  if args.generate == 1:
+    z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(
+      num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+      fixed_effort_conversion=args.fixed_effort_conversion
+      )
+  elif args.generate == 2:
+    z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data2(
+      n_seen_applicants=T, admit_all=True, applicants_per_round=args.applicants_per_round,
+      fixed_effort_conversion=args.fixed_effort_conversion
     )
   
   # plot data.
