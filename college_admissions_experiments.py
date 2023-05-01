@@ -53,6 +53,47 @@ def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
         EWi[i] -= noise
   return EWi
 
+# def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
+
+#   mean_sat, mean_gpa = 900, 2
+#   sigma_sat, sigma_gpa = 200, 0.5
+
+#   total_applicants, accepted_applicants = 0, 0
+#   while accepted_applicants < n_seen_applicants:
+
+#     # generate applicants b_t
+#     idx = 
+
+def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
+  assert n_samples % 2 == 0, f"{n_samples} not divisible by 2"
+  half = int(n_samples / 2)
+  b = np.zeros([n_samples,2])
+  
+  # indices for shuffling
+  idx = np.arange(n_samples)
+  np.random.shuffle(idx)
+  disadv_idx = idx[:half]
+  adv_idx = idx[half:]
+
+  # disadvantaged students
+  b[disadv_idx,0] = np.random.normal(mean_sat-100,sigma_sat,b[disadv_idx][:,0].shape) #SAT
+  b[disadv_idx,1] = np.random.normal(mean_gpa-.2,sigma_gpa,b[disadv_idx][:,1].shape) #GPA
+
+  # advantaged students
+  b[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,b[adv_idx][:,0].shape) #SAT
+  b[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,b[adv_idx][:,1].shape) #GPA
+
+  b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
+  b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
+
+  # confounding error term g (error on true college GPA)
+  g = np.ones(n_samples)*0.5 # legacy students shifted up
+  g[disadv_idx]=-0.5 # first-gen students shifted down
+  g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
+
+  return b, g, adv_idx, disadv_idx
+
+  
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
@@ -62,30 +103,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   sigma_sat = 200
   sigma_gpa = 0.5
 
-  # initial features (z)
-  z = np.zeros([num_applicants,m])
-
-  # indices for shuffling
-  idx = np.arange(num_applicants)
-  np.random.shuffle(idx)
-  disadv_idx = idx[:half]
-  adv_idx = idx[half:]
-
-  # disadvantaged students
-  z[disadv_idx,0] = np.random.normal(mean_sat-100,sigma_sat,z[disadv_idx][:,0].shape) #SAT
-  z[disadv_idx,1] = np.random.normal(mean_gpa-.2,sigma_gpa,z[disadv_idx][:,1].shape) #GPA
-
-  # advantaged students
-  z[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,z[adv_idx][:,0].shape) #SAT
-  z[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,z[adv_idx][:,1].shape) #GPA
-
-  z[:,0] = np.clip(z[:,0],400,1600) # clip to 400 to 1600
-  z[:,1] = np.clip(z[:,1],0,4) # clip to 0 to 4.0
-
-  # confounding error term g (error on true college GPA)
-  g = np.ones(num_applicants)*0.5 # legacy students shifted up
-  g[disadv_idx]=-0.5 # first-gen students shifted down
-  g += np.random.normal(1,0.2,size=num_applicants) # non-zero-mean
+  b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
 
   # assessment rule 
   assert num_applicants % applicants_per_round == 0
@@ -98,13 +116,12 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   # effort conversion matrices
   EW = np.array([[10.0,0],[0,1.0]])
-  EWi = np.zeros(shape=(num_applicants, 2, 2))
+  EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
 
   # observable features x
-  x = np.zeros([num_applicants,z.shape[1]])
-  EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
+  x = np.zeros([num_applicants,b.shape[1]])
   for i in range(num_applicants):
-    x[i] = z[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
+    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
   x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
@@ -133,7 +150,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   else:
     w = np.ones_like(y_hat)
 
-  return z,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
+  return b,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
 
 # %%
 def ols(x,y):
