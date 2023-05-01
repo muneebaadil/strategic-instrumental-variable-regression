@@ -88,7 +88,10 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
     y_hatr = (xr_ * thetar).sum(axis=-1)
 
     # selection
-    wr = np.ones((applicants_per_round,))
+    if not admit_all:
+      wr = get_selection(y_hatr)
+    else:
+      wr = np.ones((applicants_per_round,))
 
     # update data for iteration
     b.append(br); x.append(xr); y.append(yr); theta.append(thetar)
@@ -205,6 +208,16 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   return b,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
 
 # %%
+def get_selection(y_hat):
+  assert y_hat.ndim == 1
+  n_applicants = y_hat.shape[0]
+  w = np.zeros_like(y_hat)
+  for i, _y_hat in enumerate(y_hat):
+    y_hat_peers = y_hat[np.arange(n_applicants) != i] # scores of everyone but the current applicant
+    prob = np.mean(y_hat_peers <= _y_hat)
+    w[i] = np.random.binomial(n=1, p=prob)
+  return w
+
 def ols(x,y):
   model = LinearRegression(fit_intercept=True)
   model.fit(x, y)
@@ -263,7 +276,7 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
   return [estimates_list, error_list]
 
 #%%
-def plot_data(data, condition, name='dataset.png'):
+def plot_data(data, condition, name='dataset.pdf'):
   fig,ax=plt.subplots()
   ax.hist(data, bins='auto', color='green', label='all',  histtype='step')
   ax.hist(data[condition==0], bins='auto', color='red', label='rejected',  histtype='step')
@@ -293,6 +306,7 @@ with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
   f.write(' '.join(sys.argv))
   
 # %%
+# fix T variable.  
 T = args.num_applicants
 epochs = args.num_repeat
 half = int(T/2)
@@ -312,14 +326,15 @@ for i in tqdm(range(epochs)):
       )
   elif args.generate == 2:
     z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data2(
-      n_seen_applicants=T, admit_all=True, applicants_per_round=args.applicants_per_round,
+      n_seen_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
     )
   
   # plot data.
-  plot_data(y, w, 'dataset_y.png')
-  plot_data(y_hat, w, 'dataset_y_hat.png')
+  plot_data(y, w, 'dataset_y.pdf')
+  plot_data(y_hat, w, 'dataset_y_hat.pdf')
   try:
+    T = x.shape[0] # total applicants (admitted + rejected)
     [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
     estimates_list_mean.append(estimates_list[np.newaxis])
     error_list_mean.append(error_list[np.newaxis])
@@ -425,7 +440,7 @@ def plot_features():
 
   fig.tight_layout()
 
-  fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
+  fname = os.path.join(dirname, 'fg-ls_shifted_features.pdf')
   plt.savefig(fname, dpi=500)
   plt.close()
 
