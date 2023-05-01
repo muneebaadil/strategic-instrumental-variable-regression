@@ -53,16 +53,25 @@ def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
         EWi[i] -= noise
   return EWi
 
-# def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
+def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
 
-#   mean_sat, mean_gpa = 900, 2
-#   sigma_sat, sigma_gpa = 200, 0.5
+  mean_sat, mean_gpa = 900, 2
+  sigma_sat, sigma_gpa = 200, 0.5
+  EW = np.array([[10.0,0],[0,1.0]])
 
-#   total_applicants, accepted_applicants = 0, 0
-#   while accepted_applicants < n_seen_applicants:
+  total_applicants, accepted_applicants = 0, 0
+  while accepted_applicants < n_seen_applicants:
 
-#     # generate applicants b_t
-#     idx = 
+    # generate applicants b_t
+    br, gr, adv_idxr, disadv_idxr = generate_bt(
+      applicants_per_round, mean_sat, mean_gpa, sigma_sat, sigma_gpa
+      )
+    
+    EWi = sample_effort_conversion(EW, applicants_per_round, adv_idxr, fixed_effort_conversion)
+
+
+
+
 
 def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   assert n_samples % 2 == 0, f"{n_samples} not divisible by 2"
@@ -93,7 +102,21 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
 
   return b, g, adv_idx, disadv_idx
 
-  
+def compute_xt(EWi, b, theta):
+  assert EWi.shape[0] == b.shape[0]
+  assert b.shape[0] == theta.shape[0]
+
+  n_applicants = b.shape[0]
+
+  x = np.zeros([n_applicants,b.shape[1]])
+  # TODO: vectorize this?
+  for i in range(n_applicants):
+    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
+
+  x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
+  x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
+  return x
+
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
@@ -119,12 +142,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
 
   # observable features x
-  x = np.zeros([num_applicants,b.shape[1]])
-  for i in range(num_applicants):
-    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
-
-  x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
-  x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
+  x = compute_xt(EWi, b, theta)
 
   # true outcomes (college gpa)
   y = np.clip(np.matmul(x,theta_star) + g,0,4) # clipped outcomes
