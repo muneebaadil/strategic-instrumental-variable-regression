@@ -334,8 +334,7 @@ for i in tqdm(range(epochs)):
   plot_data(y, w, 'dataset_y.pdf')
   plot_data(y_hat, w, 'dataset_y_hat.pdf')
   try:
-    T = x.shape[0] # total applicants (admitted + rejected)
-    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
+    [estimates_list, error_list] = test_params(x.shape[0], x, y, w, theta, theta_star, args.applicants_per_round)
     estimates_list_mean.append(estimates_list[np.newaxis])
     error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
@@ -344,6 +343,8 @@ for i in tqdm(range(epochs)):
 # %%
 estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
 error_list_mean = np.concatenate(error_list_mean,axis=0)
+
+T = x.shape[0]
 
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
