@@ -36,6 +36,23 @@ args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
 # %%
+def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
+  assert adv_idx.max() < n_samples
+  EWi = np.zeros(shape=(n_samples,2,2))
+
+  for i in range(n_samples):
+    EWi[i] = EW.copy()
+    if not fixed_effort_conversion:
+      noise_mean = [0.5, 0, 0, 0.1]
+      noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
+
+      noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape((2,2))
+      if i in adv_idx:
+        EWi[i] += noise
+      else:
+        EWi[i] -= noise
+  return EWi
+
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
@@ -85,21 +102,8 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   # observable features x
   x = np.zeros([num_applicants,z.shape[1]])
+  EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
   for i in range(num_applicants):
-    # sample effort conversion matrix. 
-    EWi[i] = EW.copy()
-    if not fixed_effort_conversion: # add noise  per applicant.
-      # add noise
-      noise_mean = [0.5, 0, 0, 0.1]
-      noise_cov = [[0.25, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0.01]]
-
-      noise = np.random.multivariate_normal(noise_mean, noise_cov).reshape((2,2))
-
-      if i in adv_idx:
-        EWi[i] += noise
-      else:
-        EWi[i] -= noise
-
     x[i] = z[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
   x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
