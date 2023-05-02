@@ -243,8 +243,19 @@ def tsls(x,y,theta): # runs until round T
   return theta_hat_tsls_
 
 def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
-  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
+  [x_, y_, theta_, w_] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
+  # admitted datapoints
+  x_, y_, theta_ = x_[w_==1], y_[w_==1], theta_[w_ == 1]
+
+  x_ = x_[:num_applicants]
+  y_ = y_[:num_applicants]
+  theta_ = theta_[:num_applicants]
+
+  assert x_.shape[0] == num_applicants
+  assert y_.shape[0] == num_applicants
+  assert theta_.shape[0] == num_applicants
+  
   upp_limits = range(applicants_per_round*2,num_applicants+1,2)
   estimates_list = np.zeros([len(upp_limits),2,2])
   error_list = np.zeros([len(upp_limits),2])
@@ -252,14 +263,14 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
   i=0
   for t in tqdm(upp_limits, leave=False):
     # filtering out rejected students
-    x_round = x_shuffle[:t]
-    y_round = y_shuffle[:t]
-    theta_round = theta_shuffle[:t]
-    w_round = w_shuffle[:t]
+    x_round = x_[:t]
+    y_round = y_[:t]
+    theta_round = theta_[:t]
+    # w_round = w_[:t]
 
-    x_round = x_round[w_round==1]
-    y_round = y_round[w_round==1]
-    theta_round = theta_round[w_round==1] # TOASK:limit access to theta as well? 
+    # x_round = x_round[w_round==1]
+    # y_round = y_round[w_round==1]
+    # theta_round = theta_round[w_round==1] # TOASK:limit access to theta as well? 
 
     # estimates
     ols_estimate = ols(x_round, y_round) # ols w/ intercept estimate
@@ -334,7 +345,7 @@ for i in tqdm(range(epochs)):
   plot_data(y, w, 'dataset_y.pdf')
   plot_data(y_hat, w, 'dataset_y_hat.pdf')
   try:
-    [estimates_list, error_list] = test_params(x.shape[0], x, y, w, theta, theta_star, args.applicants_per_round)
+    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
     estimates_list_mean.append(estimates_list[np.newaxis])
     error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
@@ -455,9 +466,12 @@ def plot_error_estimate():
   ticks.insert(0,1)
 
   # plot error of OLS vs 2SLS with error bar
-  plt.errorbar(list(range(args.applicants_per_round*2,T+1,2)), np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
+  
+  assert error_list_mean.ndim == 3
+  x = np.arange(error_list_mean.shape[1])
+  plt.errorbar(x, np.mean(error_list_mean,axis=0)[:,0], yerr=np.std(error_list_mean,axis=0)[:,0], 
               color='darkorange', ecolor='wheat', label='OLS',elinewidth=10)
-  plt.errorbar(list(range(args.applicants_per_round*2,T+1,2)), np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
+  plt.errorbar(x, np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
               color='darkblue', ecolor='lightblue', label='2SLS',elinewidth=10)
   plt.ylim(0,.25)
   plt.xticks(fontsize=14)
@@ -468,7 +482,7 @@ def plot_error_estimate():
   plt.xlabel('Number of applicants (rounds)', fontsize=14)
   plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
 
-  plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
+  # plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
 
   plt.legend(fontsize=14)
   #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
