@@ -328,6 +328,40 @@ def test_params2(num_applicants, x, y, w, theta, theta_star, applicants_per_roun
   
 #   return estimates_list, error_list
 #%%
+def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
+
+  # shuffle the samples so types show up randomly
+  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
+
+  # save estimates and errors for every even round 
+  upp_limits = range(applicants_per_round*2, num_applicants+1, 2)
+  estimates_list = np.zeros([len(upp_limits),2,2])
+  error_list = np.zeros([len(upp_limits),2])
+
+  i=0
+  for t in tqdm(upp_limits, leave=False):
+    # filtering out rejected students
+    x_round = x_shuffle[:t]
+    y_round = y_shuffle[:t]
+    theta_round = theta_shuffle[:t]
+    w_round = w_shuffle[:t]
+
+    x_round = x_round[w_round==1]
+    y_round = y_round[w_round==1]
+    theta_round = theta_round[w_round==1] # TOASK:limit access to theta as well? 
+
+    # estimates
+    ols_estimate = ols(x_round, y_round) # ols w/ intercept estimate
+    tsls_estimate = tsls(x_round, y_round, theta_round) # 2sls w/ intercept estimate
+    estimates_list[i,:] += [ols_estimate,tsls_estimate]
+
+    # errors
+    ols_error = np.linalg.norm(theta_star-ols_estimate)
+    tsls_error = np.linalg.norm(theta_star-tsls_estimate)
+    error_list[i] = [ols_error,tsls_error]
+    i+=1
+  return [estimates_list, error_list]
+
 def plot_data(data, condition, name='dataset.pdf'):
   fig,ax=plt.subplots()
   ax.hist(data, bins='auto', color='green', label='all',  histtype='step')
@@ -359,9 +393,8 @@ with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
   
 # %%
 # fix T variable.  
-T = args.num_applicants
 epochs = args.num_repeat
-half = int(T/2)
+half = args.num_applicants
 
 estimates_list_mean = np.zeros((epochs,half,2,2))
 error_list_mean = np.zeros((epochs,half,2))
@@ -373,20 +406,23 @@ for i in tqdm(range(epochs)):
   np.random.seed(i)
   if args.generate == 1:
     z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(
-      num_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+      num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
       )
   elif args.generate == 2:
     z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data2(
-      n_seen_applicants=T, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+      n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
     )
   
   # plot data.
-  plot_data(y, w, 'dataset_y.pdf')
-  plot_data(y_hat, w, 'dataset_y_hat.pdf')
+  plot_data(y, w, 'dataset_y.png')
+  plot_data(y_hat, w, 'dataset_y_hat.png')
   try:
-    [estimates_list, error_list] = test_params2(T, x, y, w, theta, theta_star, args.applicants_per_round)
+    if args.generate == 1:
+      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, theta_star, args.applicants_per_round)
+    else:
+      [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, theta_star, args.applicants_per_round)
     estimates_list_mean.append(estimates_list[np.newaxis])
     error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
@@ -493,7 +529,7 @@ def plot_features():
 
   fig.tight_layout()
 
-  fname = os.path.join(dirname, 'fg-ls_shifted_features.pdf')
+  fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
   plt.savefig(fname, dpi=500)
   plt.close()
 
@@ -503,7 +539,8 @@ def plot_features():
 # vars for pyplot
 def plot_error_estimate():
   fig,ax=plt.subplots()
-  ticks = list(range(int(T/5), T+1, int(T/5)))
+  # TODO: check this. 
+  ticks = list(range(int(args.num_applicants/5), args.num_applicants+1, int(args.num_applicants/5)))
   ticks.insert(0,1)
 
   # plot error of OLS vs 2SLS with error bar
@@ -518,12 +555,13 @@ def plot_error_estimate():
   plt.xticks(fontsize=14)
   plt.yticks(fontsize=14)
   # plt.yscale('log')
-  # plt.xlim(50,T-11)
 
-  plt.xlabel('Number of applicants (rounds)', fontsize=14)
+  plt.xlabel('iterations', fontsize=14)
   plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
 
-  # plt.plot(range(1,T+1), 1/np.sqrt(range(1,T+1)), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
+  upp_limits = range(args.applicants_per_round*2, args.num_applicants+1, 2)
+  _upp_limits = range(len(upp_limits))
+  plt.plot(_upp_limits, 1/np.sqrt(_upp_limits), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
 
   plt.legend(fontsize=14)
   #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
