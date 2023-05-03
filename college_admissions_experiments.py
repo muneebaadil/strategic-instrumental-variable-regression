@@ -242,7 +242,7 @@ def tsls(x,y,theta): # runs until round T
   )
   return theta_hat_tsls_
 
-def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
+def test_params2(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
   [x_, y_, theta_, w_] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
   # admitted datapoints
@@ -285,7 +285,48 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
     i+=1
 
   return [estimates_list, error_list]
+#%%
+# def _filterAndPartition(x, y_admit, w, theta):
+#   # D_partial is same as Dfull, right?
+# def _inferCausalParams(EET_hat, x, y_admit, w, theta):
+#   Psi = _filterAndPartition(x, y_admit, w, theta)  # TOASK: dimensions of Psi?
+#   pass
+# def our(x, y_admit, w, theta): 
+#   assert y_admit.size == w.sum()
+#   # step 1. estimate EE^T.
+#   model = LinearRegression()
+#   model.fit(theta, x)
+#   EET_hat = model.coef_.T
 
+#   # step 2. infer causal params.
+#   theta_star_hat = _inferCausalParams(EET_hat, x, y_admit, w, theta)
+  
+# def test_params(n_applicants, x, y, w, theta, theta_star, applicants_per_round):
+#   # [x_, y_, theta, w] = [x.copy(), y.copy(), theta.copy(), w.copy()]
+
+#   upp_limits = range(applicants_per_round*2, n_applicants+1, 2)
+#   estimates_list = np.zeros(shape=(len(upp_limits), 2, 2))
+#   error_list = np.zeros(shape=(len(upp_limits), 2))
+
+#   i = 0
+#   for t in tqdm(upp_limits):
+#     xr, yr, thetar, wr = x[:t], y[:t], theta[:t], w[:t]
+
+#     yr_admit = yr[wr==1]
+#     xr_admit = xr[wr==1]
+#     thetar_admit = thetar[wr==1]
+
+#     ols_estimate = ols(xr_admit, yr_admit)
+#     tsls_estimate = tsls(xr_admit, yr_admit, thetar_admit)
+    
+#     estimates_list[i,:] += [ols_estimate, tsls_estimate]
+
+#     ols_error = np.linalg.norm(theta_star-ols_estimate)
+#     tsls_error = np.linalg.norm(theta_star-tsls_estimate)
+#     error_list[i] = [ols_error, tsls_error]
+#     i += 1
+  
+#   return estimates_list, error_list
 #%%
 def plot_data(data, condition, name='dataset.pdf'):
   fig,ax=plt.subplots()
@@ -345,7 +386,7 @@ for i in tqdm(range(epochs)):
   plot_data(y, w, 'dataset_y.pdf')
   plot_data(y_hat, w, 'dataset_y_hat.pdf')
   try:
-    [estimates_list, error_list] = test_params(T, x, y, w, theta, theta_star, args.applicants_per_round)
+    [estimates_list, error_list] = test_params2(T, x, y, w, theta, theta_star, args.applicants_per_round)
     estimates_list_mean.append(estimates_list[np.newaxis])
     error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
