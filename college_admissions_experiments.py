@@ -28,6 +28,7 @@ parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 parser.add_argument('--fixed-effort-conversion', action='store_true')
+parser.add_argument('--scaled-duplicates', default='random', choices=['random', 'sequence'], type=str)
 
 # experiment
 parser.add_argument('--experiment-root', type=str, default='experiments')
@@ -175,13 +176,20 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   assert n_rounds % 2 == 0
   theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
   
-  # scaled duplicated of each theta. 
+  # scaled duplicate of each theta. 
   # TODO: ablation study?
   scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
   scale = np.diag(v=scale)
   theta_scaled = scale.dot(theta)
-  theta = np.concatenate((theta, theta_scaled))
-  np.random.shuffle(theta)
+  
+  if args.scaled_duplicates=='random':
+    theta = np.concatenate((theta, theta_scaled))
+    np.random.shuffle(theta)
+  else:
+    theta_temp = np.zeros((n_rounds,m))
+    theta_temp[0::2] = theta
+    theta_temp[1::2] = theta_scaled
+    theta = theta_temp
   
   # theta repeating over the rounds.
   theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
@@ -297,54 +305,46 @@ def test_params2(num_applicants, x, y, w, theta, theta_star, applicants_per_roun
     i+=1
 
   return [estimates_list, error_list]
-#%%
-# def _filterAndPartition(x, y_admit, w, theta):
-#   # D_partial is same as Dfull, right?
-# def _inferCausalParams(EET_hat, x, y_admit, w, theta):
-#   Psi = _filterAndPartition(x, y_admit, w, theta)  # TOASK: dimensions of Psi?
-#   pass
-# def our(x, y_admit, w, theta): 
-#   assert y_admit.size == w.sum()
-#   # step 1. estimate EE^T.
-#   model = LinearRegression()
-#   model.fit(theta, x)
-#   EET_hat = model.coef_.T
-
-#   # step 2. infer causal params.
-#   theta_star_hat = _inferCausalParams(EET_hat, x, y_admit, w, theta)
   
-# def test_params(n_applicants, x, y, w, theta, theta_star, applicants_per_round):
-#   # [x_, y_, theta, w] = [x.copy(), y.copy(), theta.copy(), w.copy()]
-
-#   upp_limits = range(applicants_per_round*2, n_applicants+1, 2)
-#   estimates_list = np.zeros(shape=(len(upp_limits), 2, 2))
-#   error_list = np.zeros(shape=(len(upp_limits), 2))
-
-#   i = 0
-#   for t in tqdm(upp_limits):
-#     xr, yr, thetar, wr = x[:t], y[:t], theta[:t], w[:t]
-
-#     yr_admit = yr[wr==1]
-#     xr_admit = xr[wr==1]
-#     thetar_admit = thetar[wr==1]
-
-#     ols_estimate = ols(xr_admit, yr_admit)
-#     tsls_estimate = tsls(xr_admit, yr_admit, thetar_admit)
-    
-#     estimates_list[i,:] += [ols_estimate, tsls_estimate]
-
-#     ols_error = np.linalg.norm(theta_star-ols_estimate)
-#     tsls_error = np.linalg.norm(theta_star-tsls_estimate)
-#     error_list[i] = [ols_error, tsls_error]
-#     i += 1
-  
-#   return estimates_list, error_list
 #%%
-def our(x, y, theta):
+def our(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
-  omega_hat_ = model.coef_.T
-  return None
+  omega_hat_ = model.coef_.T # EET estimate. 
+
+  # recover scaled duplicate 
+  theta_admit = theta[w==1]
+  theta_admit_ = np.unique(theta_admit, axis=0)
+  
+  # construct linear system of eqs.
+  assert theta_admit.shape[1] > 1 # algo not applicable for only one feature.
+  n_eqs_required = theta_admit.shape[1]
+
+  curr_n_eqs = 0
+  B = np.zeros((n_eqs_required,))
+  A = np.zeros((n_eqs_required, n_eqs_required))
+
+  for i in range(theta_admit_.shape[0]):
+    for j in range(i+1, theta_admit_.shape[0]):
+      pair = theta_admit_[[i,j]]
+
+      if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
+        A[curr_n_eqs, :] = (pair[1] - pair[0]).dot(omega_hat_)
+
+        est1 = y[np.all(theta_admit == pair[1], axis=-1)].mean()
+        est0 = y[np.all(theta_admit == pair[0], axis=-1)].mean()
+        B[curr_n_eqs] = est1 - est0
+
+        curr_n_eqs += 1
+
+      if curr_n_eqs == n_eqs_required: break
+
+  if curr_n_eqs < n_eqs_required:
+    out = np.empty(shape=(n_eqs_required,))
+    out[:] = np.nan
+    return out
+
+  assert curr_n_eqs == n_eqs_required, f" {curr_n_eqs} < {n_eqs_required}"
   
 def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
 
@@ -371,7 +371,8 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    # our_estimate = our(x_round, y_round_admitted, theta_round)
+    our_estimate = our(x_round, y_round_admitted, theta_round, w_round)
+    # TODO: how do nans operate? 
     estimates_list[i,:] += [ols_estimate,tsls_estimate]
 
     # errors
