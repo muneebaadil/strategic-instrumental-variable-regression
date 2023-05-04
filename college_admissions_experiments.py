@@ -169,8 +169,20 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # assessment rule 
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
-  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+  # theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
 
+
+  assert n_rounds % 2 == 0
+  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
+  
+  # scaled duplicated of each theta. 
+  # TODO: ablation study?
+  scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
+  scale = np.diag(v=scale)
+  theta_scaled = scale.dot(theta)
+  theta = np.concatenate((theta, theta_scaled))
+  np.random.shuffle(theta)
+  
   # theta repeating over the rounds.
   theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
   assert theta.shape[0] == num_applicants
@@ -328,6 +340,12 @@ def test_params2(num_applicants, x, y, w, theta, theta_star, applicants_per_roun
   
 #   return estimates_list, error_list
 #%%
+def our(x, y, theta):
+  model = LinearRegression()
+  model.fit(theta, x)
+  omega_hat_ = model.coef_.T
+  return None
+  
 def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
 
   # shuffle the samples so types show up randomly
@@ -340,19 +358,20 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
 
   i=0
   for t in tqdm(upp_limits, leave=False):
-    # filtering out rejected students
     x_round = x_shuffle[:t]
     y_round = y_shuffle[:t]
     theta_round = theta_shuffle[:t]
     w_round = w_shuffle[:t]
 
-    x_round = x_round[w_round==1]
-    y_round = y_round[w_round==1]
-    theta_round = theta_round[w_round==1] # TOASK:limit access to theta as well? 
+    # filtering out rejected students
+    x_round_admitted = x_round[w_round==1]
+    y_round_admitted = y_round[w_round==1]
+    theta_round_admitted = theta_round[w_round==1] 
 
     # estimates
-    ols_estimate = ols(x_round, y_round) # ols w/ intercept estimate
-    tsls_estimate = tsls(x_round, y_round, theta_round) # 2sls w/ intercept estimate
+    ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
+    tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
+    # our_estimate = our(x_round, y_round_admitted, theta_round)
     estimates_list[i,:] += [ols_estimate,tsls_estimate]
 
     # errors
