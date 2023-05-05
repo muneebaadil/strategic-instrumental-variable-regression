@@ -311,8 +311,8 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
 
   # save estimates and errors for every even round 
   upp_limits = range(applicants_per_round*2, num_applicants+1, 2)
-  estimates_list = np.zeros([len(upp_limits),2,2])
-  error_list = np.zeros([len(upp_limits),2])
+  estimates_list = np.zeros([len(upp_limits),3,2])
+  error_list = np.zeros([len(upp_limits),3])
 
   i=0
   for t in tqdm(upp_limits, leave=False):
@@ -329,14 +329,14 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    # our_estimate = our(x_round, y_round_admitted, theta_round, w_round)
-    estimates_list[i,:] += [ols_estimate,tsls_estimate]
+    our_estimate = our(x_round, y_round_admitted, theta_round, w_round)
+    estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
 
     # errors
     ols_error = np.linalg.norm(theta_star-ols_estimate)
     tsls_error = np.linalg.norm(theta_star-tsls_estimate)
-    # our_error = np.linalg.norm(theta_star)
-    error_list[i] = [ols_error,tsls_error]
+    our_error = np.linalg.norm(theta_star-our_estimate)
+    error_list[i] = [ols_error,tsls_error, our_error ]
     i+=1
   return [estimates_list, error_list]
 
@@ -495,8 +495,8 @@ def plot_error_estimate():
               color='darkorange', ecolor='wheat', label='OLS',elinewidth=10)
   plt.errorbar(x, np.mean(error_list_mean,axis=0)[:,1], yerr=np.std(error_list_mean,axis=0)[:,1], 
               color='darkblue', ecolor='lightblue', label='2SLS',elinewidth=10)
-  # plt.errorbar(x, np.mean(error_list_mean,axis=0)[:,2], yerr=np.std(error_list_mean,axis=0)[:,2], 
-  #             color='green', ecolor='lightgreen', label='Our',elinewidth=10)
+  plt.errorbar(x, np.mean(error_list_mean,axis=0)[:,2], yerr=np.std(error_list_mean,axis=0)[:,2], 
+              color='green', ecolor='lightgreen', label='Our',elinewidth=10)
   plt.ylim(0,.25)
   plt.xticks(fontsize=14)
   plt.yticks(fontsize=14)
