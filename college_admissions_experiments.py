@@ -397,7 +397,7 @@ def plot_data(data, condition, name='dataset.pdf'):
   plt.savefig(os.path.join(dirname, name))
   plt.close()
 
-def plot_features():
+def plot_features(x, z, adv_idx, disadv_idx, fname):
   ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
   fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
 
@@ -481,10 +481,11 @@ def plot_features():
 
   fig.tight_layout()
 
-  fname = os.path.join(dirname, 'fg-ls_shifted_features.png')
+  fname = os.path.join(dirname, f'{fname}')
   plt.savefig(fname, dpi=500)
   plt.close()
-def plot_error_estimate():
+
+def plot_error_estimate(x, error_list_mean):
   fig,ax=plt.subplots()
   # TODO: check this. 
   ticks = list(range(int(args.num_applicants/5), args.num_applicants+1, int(args.num_applicants/5)))
@@ -510,7 +511,7 @@ def plot_error_estimate():
 
   upp_limits = range(args.applicants_per_round*2, args.num_applicants+1, 2)
   _upp_limits = range(len(upp_limits))
-  plt.plot(_upp_limits, 1/np.sqrt(_upp_limits), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
+  plt.plot(_upp_limits, 1/(np.sqrt(_upp_limits) + 1e-9), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
 
   plt.legend(fontsize=14)
   #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
@@ -521,7 +522,7 @@ def plot_error_estimate():
   plt.close()
   # plt.show()
 
-def plot_outcome():
+def plot_outcome(y, adv_idx, disadv_idx, fname):
   fig,ax=plt.subplots()
   plt.hist(y,bins='auto',label='combined')
   plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
@@ -544,7 +545,7 @@ def plot_outcome():
 
   plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
 
-  fname = os.path.join(dirname, 'all_outcome.png')
+  fname = os.path.join(dirname, f'{fname}')
   plt.savefig(fname, dpi=500, bbox_inches='tight')
   plt.close()
   # plt.show()
@@ -594,8 +595,11 @@ for i in tqdm(range(epochs)):
     )
   
   # plot data.
-  plot_data(y, w, 'dataset_y.png')
-  plot_data(y_hat, w, 'dataset_y_hat.png')
+  plot_data(y, w, f'outcome_select_d{i}.png')
+  # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
+  plot_features(x, z, adv_idx, disadv_idx, f'features_d{i}.png')
+  plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
+
   try:
     if args.generate == 1:
       [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, theta_star, args.applicants_per_round)
@@ -623,11 +627,4 @@ with open(filename, 'wb') as f:
     pkl.dump(save, f)
 
 # %%
-
-# %%
-# vars for pyplot
-
-# %%
-plot_features()
 plot_error_estimate()
-plot_outcome()
