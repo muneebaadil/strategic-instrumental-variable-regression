@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from sklearn.linear_model import LinearRegression
-
-#%%
 from types import SimpleNamespace
 # for notebook. 
 args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True, admit_all=False)
@@ -22,6 +20,7 @@ def get_git_revision_hash() -> str:
 # %%
 import argparse
 parser = argparse.ArgumentParser()
+parser.add_argument('--n-cores', default=1, type=int)
 parser.add_argument('--num-applicants', default=10000, type=int)
 parser.add_argument('--num-repeat', default=10, type=int)
 parser.add_argument('--test-run', action='store_true')
@@ -550,6 +549,35 @@ def plot_outcome(y, adv_idx, disadv_idx, fname):
   plt.close()
   # plt.show()
 
+def run_experiment(args, i):
+  np.random.seed(i)
+  if args.generate == 1:
+    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data(
+      num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+      fixed_effort_conversion=args.fixed_effort_conversion
+      )
+  elif args.generate == 2:
+    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
+      n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+      fixed_effort_conversion=args.fixed_effort_conversion
+    )
+  # plot data.
+  plot_data(y, w, f'outcome_select_d{i}.png')
+  # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
+  plot_features(x, z, adv_idx, disadv_idx, f'features_d{i}.png')
+  plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
+
+  try:
+    if args.generate == 1:
+      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+    else:
+      [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+    return estimates_list[np.newaxis], error_list[np.newaxis]
+    # estimates_list_mean.append(estimates_list[np.newaxis])
+    # error_list_mean.append(error_list[np.newaxis])
+  except np.linalg.LinAlgError:
+    pass # record nothing in case the algorithm fails.  
+
 # %% 
 import pickle as pkl
 import time
@@ -578,42 +606,32 @@ error_list_mean = np.zeros((epochs,half,2))
 estimates_list_mean = []
 error_list_mean = []
 
-def run_experiment(args, i):
-  if args.generate == 1:
-    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data(
-      num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-      fixed_effort_conversion=args.fixed_effort_conversion
-      )
-  elif args.generate == 2:
-    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
-      n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-      fixed_effort_conversion=args.fixed_effort_conversion
-    )
-  # plot data.
-  plot_data(y, w, f'outcome_select_d{i}.png')
-  # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
-  plot_features(x, z, adv_idx, disadv_idx, f'features_d{i}.png')
-  plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
-
-  try:
-    if args.generate == 1:
-      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round)
-    else:
-      [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
-    return estimates_list[np.newaxis], error_list[np.newaxis]
-    # estimates_list_mean.append(estimates_list[np.newaxis])
-    # error_list_mean.append(error_list[np.newaxis])
-  except np.linalg.LinAlgError:
-    pass # record nothing in case the algorithm fails.  
-
 estimates_list_mean, error_list_mean = [], [] 
-for i in tqdm(range(epochs)):
-  # run experiment
-  np.random.seed(i)
-  estimates_list, error_list = run_experiment(args, i)
 
-  estimates_list_mean.append(estimates_list)
-  error_list_mean.append(error_list)
+if args.n_cores == 1:  # sequential
+  for i in tqdm(range(epochs)):
+    # run experiment
+    estimates_list, error_list = run_experiment(args, i)
+
+    estimates_list_mean.append(estimates_list)
+    error_list_mean.append(error_list)
+elif args.n_cores > 1:
+  import multiprocessing as mp  
+  args_list = [(args, i) for i in range(epochs)]
+  with mp.Pool(processes=args.n_cores) as p:
+    out = p.starmap(
+      run_experiment, args_list
+    )
+
+  for _out in out:
+    if not (_out is None): # if no LA error.
+      estimates_list_mean.append(_out[0])
+      error_list_mean.append(_out[1])
+
+  # estimates_list_mean = [_out[0] for _out in out]
+  # error_list_mean = [_out[1] for _out in out]
+else:
+  print('n cores invalid.')
   
 estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
 error_list_mean = np.concatenate(error_list_mean,axis=0)
