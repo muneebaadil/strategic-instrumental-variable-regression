@@ -324,8 +324,10 @@ def our(x, y, theta, w):
   B = np.zeros((n_eqs_required,))
   A = np.zeros((n_eqs_required, n_eqs_required))
 
-  for i in range(theta_admit_.shape[0]):
-    for j in range(i+1, theta_admit_.shape[0]):
+  i = 0
+  while (i < theta_admit_.shape[0]) and curr_n_eqs < n_eqs_required:
+    j = i+1
+    while (j < theta_admit_.shape[0]) and (curr_n_eqs < n_eqs_required):
       pair = theta_admit_[[i,j]]
 
       if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
@@ -337,15 +339,18 @@ def our(x, y, theta, w):
 
         curr_n_eqs += 1
 
-      if curr_n_eqs == n_eqs_required: break
+      j += 1
+    i += 1 
 
   if curr_n_eqs < n_eqs_required:
     out = np.empty(shape=(n_eqs_required,))
     out[:] = np.nan
     return out
 
-  assert curr_n_eqs == n_eqs_required, f" {curr_n_eqs} < {n_eqs_required}"
-  
+  theta_star_est = np.linalg.inv(A).dot(B)
+  return theta_star_est
+
+
 def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
 
   # shuffle the samples so types show up randomly
