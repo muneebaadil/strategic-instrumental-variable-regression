@@ -267,7 +267,10 @@ def our(x, y, theta, w):
 
   # recover scaled duplicate 
   theta_admit = theta[w==1]
-  theta_admit_ = np.unique(theta_admit, axis=0)
+  theta_admit_, counts = np.unique(theta_admit, axis=0, return_counts=True)
+  # to use thetas having the most number of applicants
+  idx = np.argsort(counts); idx = idx[::-1]
+  theta_admit_ = theta_admit_[idx]
   
   # construct linear system of eqs.
   assert theta_admit.shape[1] > 1 # algo not applicable for only one feature.
