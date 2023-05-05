@@ -181,7 +181,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   else:
     w = np.ones_like(y_hat)
 
-  return b,x,y,EW,theta,theta_star, w, y_hat, adv_idx, disadv_idx
+  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx
 
 def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
 
@@ -233,7 +233,7 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
       lambda x: np.concatenate(x, axis=0),
       (b, x, y, theta, w, y_hat, adv_idx, disadv_idx)
       )
-  return b, x, y, EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx
+  return b, x, y, EW, theta, w, y_hat, adv_idx, disadv_idx
 # %%
 def ols(x,y):
   model = LinearRegression(fit_intercept=True)
@@ -307,7 +307,7 @@ def our(x, y, theta, w):
   return theta_star_est
 
 
-def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
+def test_params(num_applicants, x, y, w, theta, applicants_per_round):
 
   # shuffle the samples so types show up randomly
   [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
@@ -343,7 +343,7 @@ def test_params(num_applicants, x, y, w, theta, theta_star, applicants_per_round
     i+=1
   return [estimates_list, error_list]
 
-def test_params2(num_applicants, x, y, w, theta, theta_star, applicants_per_round):
+def test_params2(num_applicants, x, y, w, theta, applicants_per_round):
   [x_, y_, theta_, w_] = [x.copy(),y.copy(),theta.copy(), w.copy()]
 
   # admitted datapoints
@@ -485,7 +485,7 @@ def plot_features(x, z, adv_idx, disadv_idx, fname):
   plt.savefig(fname, dpi=500)
   plt.close()
 
-def plot_error_estimate(x, error_list_mean):
+def plot_error_estimate(error_list_mean):
   fig,ax=plt.subplots()
   # TODO: check this. 
   ticks = list(range(int(args.num_applicants/5), args.num_applicants+1, int(args.num_applicants/5)))
@@ -570,8 +570,6 @@ with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
   f.write('\n')
   f.write(' '.join(sys.argv))
   
-# %%
-# fix T variable.  
 epochs = args.num_repeat
 half = args.num_applicants
 
@@ -580,20 +578,17 @@ error_list_mean = np.zeros((epochs,half,2))
 estimates_list_mean = []
 error_list_mean = []
 
-#%%
-for i in tqdm(range(epochs)):
-  np.random.seed(i)
+def run_experiment(args, i):
   if args.generate == 1:
-    z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data(
+    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data(
       num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
       )
   elif args.generate == 2:
-    z,x,y,EW, theta, theta_star, w, y_hat, adv_idx, disadv_idx = generate_data2(
+    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
       n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
     )
-  
   # plot data.
   plot_data(y, w, f'outcome_select_d{i}.png')
   # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
@@ -602,19 +597,27 @@ for i in tqdm(range(epochs)):
 
   try:
     if args.generate == 1:
-      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, theta_star, args.applicants_per_round)
+      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round)
     else:
-      [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, theta_star, args.applicants_per_round)
-    estimates_list_mean.append(estimates_list[np.newaxis])
-    error_list_mean.append(error_list[np.newaxis])
+      [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+    return estimates_list[np.newaxis], error_list[np.newaxis]
+    # estimates_list_mean.append(estimates_list[np.newaxis])
+    # error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
     pass # record nothing in case the algorithm fails.  
 
-# %%
+estimates_list_mean, error_list_mean = [], [] 
+for i in tqdm(range(epochs)):
+  # run experiment
+  np.random.seed(i)
+  estimates_list, error_list = run_experiment(args, i)
+
+  estimates_list_mean.append(estimates_list)
+  error_list_mean.append(error_list)
+  
 estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
 error_list_mean = np.concatenate(error_list_mean,axis=0)
 
-T = x.shape[0]
 
 filename = os.path.join(dirname, "data")
 # filename = 'college_admission_'+timestr
@@ -622,9 +625,8 @@ with open(filename, 'wb') as f:
     save = {
       'estimates_list_mean': estimates_list_mean, 
       'error_list_mean': error_list_mean,
-      'y': y, 'x': x, 'z': z,  'EW':EW, 'theta':theta, 'theta_star': theta_star, 'w': w, 'y_hat':y_hat
+      # 'y': y, 'x': x, 'z': z,  'EW':EW, 'theta':theta, 'theta_star': theta_star, 'w': w, 'y_hat':y_hat
     }
     pkl.dump(save, f)
 
-# %%
-plot_error_estimate()
+plot_error_estimate(error_list_mean)
