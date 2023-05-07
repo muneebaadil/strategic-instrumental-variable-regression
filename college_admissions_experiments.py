@@ -171,16 +171,17 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   y_hat = (x_ * theta).sum(axis=-1)
   if not admit_all:
     w = np.zeros_like(y_hat)
-    i = 0
     # comparing people coming in the same rounds. 
     for r in range(n_rounds):
       y_hat_r = y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
   
-      for j, _y_hat_r in enumerate(y_hat_r):
-        y_hat_r_peers = y_hat_r[np.arange(applicants_per_round) != j]
-        prob = np.mean(y_hat_r_peers  <= _y_hat_r)
-        w[i] = np.random.binomial(n=1, p=prob)
-        i += 1
+      w_r = get_selection(y_hat_r)
+      w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
+      # for j, _y_hat_r in enumerate(y_hat_r):
+      #   y_hat_r_peers = y_hat_r[np.arange(applicants_per_round) != j]
+      #   prob = np.mean(y_hat_r_peers  <= _y_hat_r)
+      #   w[i] = np.random.binomial(n=1, p=prob)
+      #   i += 1
   else:
     w = np.ones_like(y_hat)
 
@@ -296,12 +297,14 @@ def our(x, y, theta, w, b, o):
       if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
         A[curr_n_eqs, :] = (pair[1] - pair[0]).dot(omega_hat_)
 
-        grp1 = b_admit[np.all(theta_admit == pair[1], axis=-1)].dot(theta_star).mean() + o_admit[np.all(theta_admit == pair[1], axis=-1)].mean()
-        grp0 = b_admit[np.all(theta_admit == pair[0], axis=-1)].dot(theta_star).mean() + o_admit[np.all(theta_admit == pair[0], axis=-1)].mean()
+        idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
+        idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
+        grp1 = b_admit[idx_grp1].dot(theta_star).mean() + o_admit[idx_grp1].mean()
+        grp0 = b_admit[idx_grp0].dot(theta_star).mean() + o_admit[idx_grp0].mean()
         grp_data['grp1'].append(grp1)
         grp_data['grp0'].append(grp0)
-        est1 = y[np.all(theta_admit == pair[1], axis=-1)].mean()
-        est0 = y[np.all(theta_admit == pair[0], axis=-1)].mean()
+        est1 = y[idx_grp1].mean()
+        est0 = y[idx_grp0].mean()
         B[curr_n_eqs] = est1 - est0
 
         curr_n_eqs += 1
