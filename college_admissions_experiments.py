@@ -1,5 +1,6 @@
 # %%
 import sys
+import json
 import os
 import subprocess
 from time import time 
@@ -38,6 +39,8 @@ parser.add_argument('--generate', default=1, choices=[1,2], type=int)
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
+
+grp_data = {'grp1': [], 'grp0': []}
 # %%
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
   assert adv_idx.max() < n_samples
@@ -173,14 +176,15 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
     for r in range(n_rounds):
       y_hat_r = y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
   
-      for _y_hat_r in y_hat_r:
-        prob = np.mean(y_hat_r <= _y_hat_r)
+      for j, _y_hat_r in enumerate(y_hat_r):
+        y_hat_r_peers = y_hat_r[np.arange(applicants_per_round) != j]
+        prob = np.mean(y_hat_r_peers  <= _y_hat_r)
         w[i] = np.random.binomial(n=1, p=prob)
         i += 1
   else:
     w = np.ones_like(y_hat)
 
-  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx
+  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx, g
 
 def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
 
@@ -259,7 +263,7 @@ def tsls(x,y,theta): # runs until round T
   return theta_hat_tsls_
   
 #%%
-def our(x, y, theta, w):
+def our(x, y, theta, w, b, o):
   model = LinearRegression()
   model.fit(theta, x)
   omega_hat_ = model.coef_.T # EET estimate. 
@@ -270,6 +274,10 @@ def our(x, y, theta, w):
   # to use thetas having the most number of applicants
   idx = np.argsort(counts); idx = idx[::-1]
   theta_admit_ = theta_admit_[idx]
+
+  assert b.shape[0] == theta.shape[0]
+  assert o.shape[0] == theta.shape[0]
+  b_admit, o_admit = b[w==1], o[w==1]
   
   # construct linear system of eqs.
   assert theta_admit.shape[1] > 1 # algo not applicable for only one feature.
@@ -288,6 +296,10 @@ def our(x, y, theta, w):
       if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
         A[curr_n_eqs, :] = (pair[1] - pair[0]).dot(omega_hat_)
 
+        grp1 = b_admit[np.all(theta_admit == pair[1], axis=-1)].dot(theta_star).mean() + o_admit[np.all(theta_admit == pair[1], axis=-1)].mean()
+        grp0 = b_admit[np.all(theta_admit == pair[0], axis=-1)].dot(theta_star).mean() + o_admit[np.all(theta_admit == pair[0], axis=-1)].mean()
+        grp_data['grp1'].append(grp1)
+        grp_data['grp0'].append(grp0)
         est1 = y[np.all(theta_admit == pair[1], axis=-1)].mean()
         est0 = y[np.all(theta_admit == pair[0], axis=-1)].mean()
         B[curr_n_eqs] = est1 - est0
@@ -306,7 +318,7 @@ def our(x, y, theta, w):
   return theta_star_est
 
 
-def test_params(num_applicants, x, y, w, theta, applicants_per_round):
+def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
 
   # shuffle the samples so types show up randomly
   [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
@@ -323,16 +335,25 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round):
     theta_round = theta_shuffle[:t]
     w_round = w_shuffle[:t]
 
+    b_round, o_round = b[:t], o[:t]
+
     # filtering out rejected students
     x_round_admitted = x_round[w_round==1]
     y_round_admitted = y_round[w_round==1]
     theta_round_admitted = theta_round[w_round==1] 
 
+
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    our_estimate = our(x_round, y_round_admitted, theta_round, w_round)
+    our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round)
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
+
+    # check if EE.T estimate is identical
+    # if args.admit_all:
+    #   assert np.all(x_round_admitted == x_round)
+    #   assert np.all(theta_round_admitted == theta_round)
+    #   assert np.all(o1==o2)
 
     # errors
     ols_error = np.linalg.norm(theta_star-ols_estimate)
@@ -552,24 +573,24 @@ def plot_outcome(y, adv_idx, disadv_idx, fname):
 def run_experiment(args, i):
   np.random.seed(i)
   if args.generate == 1:
-    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data(
+    b,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx, o = generate_data(
       num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
       )
   elif args.generate == 2:
-    z,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
+    b,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
       n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
     )
   # plot data.
   plot_data(y, w, f'outcome_select_d{i}.png')
   # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
-  plot_features(x, z, adv_idx, disadv_idx, f'features_d{i}.png')
+  plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
 
   try:
     if args.generate == 1:
-      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o)
     else:
       [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
     return estimates_list[np.newaxis], error_list[np.newaxis]
@@ -648,3 +669,8 @@ with open(filename, 'wb') as f:
     pkl.dump(save, f)
 
 plot_error_estimate(error_list_mean)
+
+# save group data.
+filename = os.path.join(dirname, "grp_data.json")
+with open(filename, "w") as f:
+  json.dump(grp_data, f)
