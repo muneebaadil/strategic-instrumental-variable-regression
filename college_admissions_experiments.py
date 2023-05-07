@@ -320,9 +320,6 @@ def our(x, y, theta, w, b, o):
 
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
 
-  # shuffle the samples so types show up randomly
-  [x_shuffle,y_shuffle,theta_shuffle, w_shuffle] = [x.copy(),y.copy(),theta.copy(), w.copy()]
-
   # save estimates and errors for every even round 
   upp_limits = range(applicants_per_round*2, num_applicants+1, 2)
   estimates_list = np.zeros([len(upp_limits),3,2])
@@ -330,10 +327,10 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
 
   i=0
   for t in tqdm(upp_limits, leave=False):
-    x_round = x_shuffle[:t]
-    y_round = y_shuffle[:t]
-    theta_round = theta_shuffle[:t]
-    w_round = w_shuffle[:t]
+    x_round = x[:t]
+    y_round = y[:t]
+    theta_round = theta[:t]
+    w_round = w[:t]
 
     b_round, o_round = b[:t], o[:t]
 
