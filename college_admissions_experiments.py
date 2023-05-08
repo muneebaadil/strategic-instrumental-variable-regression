@@ -322,9 +322,8 @@ def our(x, y, theta, w, b, o):
 
 
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
-
   # save estimates and errors for every even round 
-  upp_limits = range(applicants_per_round*2, num_applicants+1, 2)
+  upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
   estimates_list = np.zeros([len(upp_limits),3,2])
   error_list = np.zeros([len(upp_limits),3])
 
