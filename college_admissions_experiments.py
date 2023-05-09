@@ -41,11 +41,9 @@ args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
 
-# grp_data = {'grp1': [], 'grp0': []}
-eqs_data = {'lhs': [], 'grp1_termA': [], 'grp1_termB': [], 'grp0_termA':[], 'grp0_termB':[]}
 eqs_data = {}
 for i in (1, 0):
-  for k in ('y', 'b', 'theta', 'o', 'theta_hat'):
+  for k in ('y', 'b', 'theta', 'o', 'theta_hat', 'b_mean', 'o_mean'):
     eqs_data[f'grp{i}_{k}'] = [] 
 # %%
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
@@ -262,15 +260,19 @@ def our(x, y, theta, w, b, o, effort_conversion_matrix):
 
         curr_n_eqs += 1
 
+        l1 = b_admit[idx_grp1].dot(theta_star)
+        l2 = o_admit[idx_grp1]
         eqs_data['grp1_y'].append(est1)
-        eqs_data['grp1_b'].append(b_admit[idx_grp1].dot(theta_star).mean())
-        eqs_data['grp1_o'].append(o_admit[idx_grp1].mean())
+        eqs_data['grp1_b'].append(l1.tolist()); eqs_data['grp1_b_mean'].append(l1.mean())
+        eqs_data['grp1_o'].append(l2.tolist()); eqs_data['grp1_o_mean'].append(l2.mean())
         eqs_data['grp1_theta'].append(pair[1].dot(E.dot(E.T)).dot(theta_star))
         eqs_data['grp1_theta_hat'].append(pair[1].dot(omega_hat_).dot(theta_star))
 
+        l1 = b_admit[idx_grp0].dot(theta_star)
+        l2 = o_admit[idx_grp0]
         eqs_data['grp0_y'].append(est0)
-        eqs_data['grp0_b'].append(b_admit[idx_grp0].dot(theta_star).mean())
-        eqs_data['grp0_o'].append(o_admit[idx_grp0].mean())
+        eqs_data['grp0_b'].append(l1.tolist()); eqs_data['grp0_b_mean'].append(l1.mean())
+        eqs_data['grp0_o'].append(l2.tolist()); eqs_data['grp0_o_mean'].append(l2.mean())
         eqs_data['grp0_theta'].append(pair[0].dot(E.dot(E.T)).dot(theta_star))
         eqs_data['grp0_theta_hat'].append(pair[0].dot(omega_hat_).dot(theta_star))
 
