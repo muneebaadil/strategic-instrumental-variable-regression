@@ -32,6 +32,7 @@ parser.add_argument('--scaled-duplicates', default='random', choices=['random', 
 parser.add_argument('--points-thres', default=10, type=int)
 parser.add_argument('--sample-weights', action='store_true')
 parser.add_argument('--estimator', required=True, type=str, choices=['inverse', 'regression'])
+parser.add_argument('--clip', action='store_true')
 # experiment
 parser.add_argument('--experiment-root', type=str, default='experiments')
 parser.add_argument('--experiment-name', type=str)
@@ -84,8 +85,9 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   b[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,b[adv_idx][:,0].shape) #SAT
   b[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,b[adv_idx][:,1].shape) #GPA
 
-  # b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
-  # b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
+  if args.clip:
+    b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
+    b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
   g = np.ones(n_samples)*0.5 # legacy students shifted up
@@ -105,8 +107,9 @@ def compute_xt(EWi, b, theta):
   for i in range(n_applicants):
     x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
-  # x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
-  # x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
+  if args.clip:
+    x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
+    x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
   return x
 
 def get_selection(y_hat):
@@ -169,6 +172,8 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # true outcomes (college gpa)
   # y = np.clip() # clipped outcomes
   y = np.matmul(x,theta_star) + g
+  if args.clip:
+    y = np.clip(y, 0, 4)
   
   # our setup addition 
   # computing admission results.
@@ -390,10 +395,12 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    if args.estimator == 'inverse':
-      our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    elif args.estimator == 'regression':
-      our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    # if args.estimator == 'inverse':
+    #   our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    # elif args.estimator == 'regression':
+    #   our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    our_estimate = np.empty(shape=(2,))
+    our_estimate[:] = np.nan
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
 
     # check if EE.T estimate is identical
@@ -588,7 +595,7 @@ def run_experiment(args, i):
   #   )
   # plot data.
   plot_data(y, w, f'outcome_select_d{i}.png')
-  # plot_data(y_hat, w, f'dataset_y_hat_d{i}.png')
+  plot_data(y_hat, w, f'outcome_pred_select_d{i}.png')
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
 
