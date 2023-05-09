@@ -40,7 +40,12 @@ args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
 
-grp_data = {'grp1': [], 'grp0': []}
+# grp_data = {'grp1': [], 'grp0': []}
+eqs_data = {'lhs': [], 'grp1_termA': [], 'grp1_termB': [], 'grp0_termA':[], 'grp0_termB':[]}
+eqs_data = {}
+for i in (1, 0):
+  for k in ('y', 'b', 'theta', 'o', 'theta_hat'):
+    eqs_data[f'grp{i}_{k}'] = [] 
 # %%
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
   assert adv_idx.max() < n_samples
@@ -229,6 +234,7 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
     w.append(wr); y_hat.append(y_hatr)
     adv_idx.append(adv_idxr + total_applicants) # offset 
     disadv_idx.append(disadv_idxr + total_applicants) # offset
+# ax.scatter(data['grp0_y'], y_est, color='r')
 
     total_applicants += applicants_per_round
     accepted_applicants += np.sum(wr)
@@ -264,7 +270,8 @@ def tsls(x,y,theta): # runs until round T
   return theta_hat_tsls_
   
 #%%
-def our(x, y, theta, w, b, o):
+def our(x, y, theta, w, b, o, effort_conversion_matrix):
+  E = effort_conversion_matrix
   model = LinearRegression()
   model.fit(theta, x)
   omega_hat_ = model.coef_.T # EET estimate. 
@@ -299,15 +306,29 @@ def our(x, y, theta, w, b, o):
 
         idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
         idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
-        grp1 = b_admit[idx_grp1].dot(theta_star).mean() + o_admit[idx_grp1].mean()
-        grp0 = b_admit[idx_grp0].dot(theta_star).mean() + o_admit[idx_grp0].mean()
-        grp_data['grp1'].append(grp1)
-        grp_data['grp0'].append(grp0)
+        termA_grp1 = b_admit[idx_grp1].dot(theta_star).mean() + o_admit[idx_grp1].mean()
+        termA_grp0 = b_admit[idx_grp0].dot(theta_star).mean() + o_admit[idx_grp0].mean()
+
+        termB_grp1 = pair[1].dot(E.dot(E.T)).dot(theta_star)
+        termB_grp1 = pair[0].dot(E.dot(E.T)).dot(theta_star)
+
         est1 = y[idx_grp1].mean()
         est0 = y[idx_grp0].mean()
         B[curr_n_eqs] = est1 - est0
 
         curr_n_eqs += 1
+
+        eqs_data['grp1_y'].append(est1)
+        eqs_data['grp1_b'].append(b_admit[idx_grp1].dot(theta_star).mean())
+        eqs_data['grp1_o'].append(o_admit[idx_grp1].mean())
+        eqs_data['grp1_theta'].append(pair[1].dot(E.dot(E.T)).dot(theta_star))
+        eqs_data['grp1_theta_hat'].append(pair[1].dot(omega_hat_).dot(theta_star))
+
+        eqs_data['grp0_y'].append(est0)
+        eqs_data['grp0_b'].append(b_admit[idx_grp0].dot(theta_star).mean())
+        eqs_data['grp0_o'].append(o_admit[idx_grp0].mean())
+        eqs_data['grp0_theta'].append(pair[0].dot(E.dot(E.T)).dot(theta_star))
+        eqs_data['grp0_theta_hat'].append(pair[0].dot(omega_hat_).dot(theta_star))
 
       j += 1
     i += 1 
@@ -321,7 +342,7 @@ def our(x, y, theta, w, b, o):
   return theta_star_est
 
 
-def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
+def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
   upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
   estimates_list = np.zeros([len(upp_limits),3,2])
@@ -345,7 +366,7 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o):
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round)
+    our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
 
     # check if EE.T estimate is identical
@@ -589,7 +610,7 @@ def run_experiment(args, i):
 
   try:
     if args.generate == 1:
-      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o)
+      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o, EW)
     else:
       [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
     return estimates_list[np.newaxis], error_list[np.newaxis]
@@ -670,6 +691,6 @@ with open(filename, 'wb') as f:
 plot_error_estimate(error_list_mean)
 
 # save group data.
-filename = os.path.join(dirname, "grp_data.json")
+filename = os.path.join(dirname, "eqs_data.json")
 with open(filename, "w") as f:
-  json.dump(grp_data, f)
+  json.dump(eqs_data, f)
