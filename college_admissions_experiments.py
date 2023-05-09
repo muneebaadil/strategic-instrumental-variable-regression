@@ -36,6 +36,7 @@ parser.add_argument('--experiment-name', type=str)
 
 # temporary
 parser.add_argument('--generate', default=1, choices=[1,2], type=int)
+parser.add_argument('--stream', action='store_true')
 args = parser.parse_args()
 
 theta_star = np.array([0,0.5])
@@ -83,8 +84,8 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   b[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,b[adv_idx][:,0].shape) #SAT
   b[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,b[adv_idx][:,1].shape) #GPA
 
-  b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
-  b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
+  # b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
+  # b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
   g = np.ones(n_samples)*0.5 # legacy students shifted up
@@ -104,8 +105,8 @@ def compute_xt(EWi, b, theta):
   for i in range(n_applicants):
     x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
-  x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
-  x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
+  # x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
+  # x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
   return x
 
 def get_selection(y_hat):
@@ -166,7 +167,8 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   x = compute_xt(EWi, b, theta)
 
   # true outcomes (college gpa)
-  y = np.clip(np.matmul(x,theta_star) + g,0,4) # clipped outcomes
+  # y = np.clip() # clipped outcomes
+  y = np.matmul(x,theta_star) + g
   
   # our setup addition 
   # computing admission results.
@@ -286,7 +288,10 @@ def our(x, y, theta, w, b, o, effort_conversion_matrix):
 
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
-  upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
+  if args.stream:
+    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
+  else:
+    upp_limits = [num_applicants]
   estimates_list = np.zeros([len(upp_limits),3,2])
   error_list = np.zeros([len(upp_limits),3])
 
