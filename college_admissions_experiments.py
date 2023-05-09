@@ -366,7 +366,7 @@ def our(x, y, theta, w, b, o, effort_conversion_matrix):
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
   if args.stream:
-    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
+    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, 2)]
   else:
     upp_limits = [num_applicants]
   estimates_list = np.zeros([len(upp_limits),3,2])
