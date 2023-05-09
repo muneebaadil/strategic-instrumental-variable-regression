@@ -234,7 +234,6 @@ def generate_data2(n_seen_applicants, admit_all, applicants_per_round, fixed_eff
     w.append(wr); y_hat.append(y_hatr)
     adv_idx.append(adv_idxr + total_applicants) # offset 
     disadv_idx.append(disadv_idxr + total_applicants) # offset
-# ax.scatter(data['grp0_y'], y_est, color='r')
 
     total_applicants += applicants_per_round
     accepted_applicants += np.sum(wr)
@@ -306,12 +305,6 @@ def our(x, y, theta, w, b, o, effort_conversion_matrix):
 
         idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
         idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
-        termA_grp1 = b_admit[idx_grp1].dot(theta_star).mean() + o_admit[idx_grp1].mean()
-        termA_grp0 = b_admit[idx_grp0].dot(theta_star).mean() + o_admit[idx_grp0].mean()
-
-        termB_grp1 = pair[1].dot(E.dot(E.T)).dot(theta_star)
-        termB_grp1 = pair[0].dot(E.dot(E.T)).dot(theta_star)
-
         est1 = y[idx_grp1].mean()
         est0 = y[idx_grp0].mean()
         B[curr_n_eqs] = est1 - est0
