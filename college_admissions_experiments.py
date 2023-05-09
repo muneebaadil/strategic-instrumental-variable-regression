@@ -261,21 +261,21 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
         
         curr_n_eqs += 1
 
-        l1 = b_admit[idx_grp1].dot(theta_star)
-        l2 = o_admit[idx_grp1]
-        eqs_data['grp1_y'].append(est1)
-        eqs_data['grp1_b'].append(l1.tolist()); eqs_data['grp1_b_mean'].append(l1.mean())
-        eqs_data['grp1_o'].append(l2.tolist()); eqs_data['grp1_o_mean'].append(l2.mean())
-        eqs_data['grp1_theta'].append(pair[1].dot(E.dot(E.T)).dot(theta_star))
-        eqs_data['grp1_theta_hat'].append(pair[1].dot(omega_hat_).dot(theta_star))
+        # l1 = b_admit[idx_grp1].dot(theta_star)
+        # l2 = o_admit[idx_grp1]
+        # eqs_data['grp1_y'].append(est1)
+        # eqs_data['grp1_b'].append(l1.tolist()); eqs_data['grp1_b_mean'].append(l1.mean())
+        # eqs_data['grp1_o'].append(l2.tolist()); eqs_data['grp1_o_mean'].append(l2.mean())
+        # eqs_data['grp1_theta'].append(pair[1].dot(E.dot(E.T)).dot(theta_star))
+        # eqs_data['grp1_theta_hat'].append(pair[1].dot(omega_hat_).dot(theta_star))
 
-        l1 = b_admit[idx_grp0].dot(theta_star)
-        l2 = o_admit[idx_grp0]
-        eqs_data['grp0_y'].append(est0)
-        eqs_data['grp0_b'].append(l1.tolist()); eqs_data['grp0_b_mean'].append(l1.mean())
-        eqs_data['grp0_o'].append(l2.tolist()); eqs_data['grp0_o_mean'].append(l2.mean())
-        eqs_data['grp0_theta'].append(pair[0].dot(E.dot(E.T)).dot(theta_star))
-        eqs_data['grp0_theta_hat'].append(pair[0].dot(omega_hat_).dot(theta_star))
+        # l1 = b_admit[idx_grp0].dot(theta_star)
+        # l2 = o_admit[idx_grp0]
+        # eqs_data['grp0_y'].append(est0)
+        # eqs_data['grp0_b'].append(l1.tolist()); eqs_data['grp0_b_mean'].append(l1.mean())
+        # eqs_data['grp0_o'].append(l2.tolist()); eqs_data['grp0_o_mean'].append(l2.mean())
+        # eqs_data['grp0_theta'].append(pair[0].dot(E.dot(E.T)).dot(theta_star))
+        # eqs_data['grp0_theta_hat'].append(pair[0].dot(omega_hat_).dot(theta_star))
 
       j += 1
     i += 1 
@@ -437,7 +437,7 @@ def plot_features(x, z, adv_idx, disadv_idx, fname):
   ax1.axvline(x=np.mean(z[disadv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
 
   ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
-  ax1.set_xlim(0,4)
+  # ax1.set_xlim(0,4)
   ax1.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
   ax1.set_ylabel('Number of applicants',fontsize=14)
   ax1.tick_params(axis="x", labelsize=14)
@@ -454,7 +454,7 @@ def plot_features(x, z, adv_idx, disadv_idx, fname):
   ax2.axvline(x=np.mean(z[disadv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
 
   ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
-  ax2.set_xlim(400,1600)
+  # ax2.set_xlim(400,1600)
   ax2.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
   ax2.set_ylabel('Number of applicants',fontsize=14)
   ax2.tick_params(axis="x", labelsize=14)
@@ -470,7 +470,7 @@ def plot_features(x, z, adv_idx, disadv_idx, fname):
   ax3.axvline(x=np.mean(x[adv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
 
   ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
-  ax3.set_xlim(0,4)
+  # ax3.set_xlim(0,4)
   ax3.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
   ax3.set_ylabel('Number of applicants',fontsize=14)
   ax3.tick_params(axis="x", labelsize=14)
@@ -484,7 +484,7 @@ def plot_features(x, z, adv_idx, disadv_idx, fname):
   ax4.axvline(x=np.mean(x[adv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
 
   ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
-  ax4.set_xlim(400,1600)
+  # ax4.set_xlim(400,1600)
   ax4.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
   ax4.set_ylabel('Number of applicants',fontsize=14)
   ax4.tick_params(axis="x", labelsize=14)
@@ -559,7 +559,7 @@ def plot_outcome(y, adv_idx, disadv_idx, fname):
   plt.hist(y[adv_idx],bins='auto',label='advantaged', alpha=0.7)
   plt.axvline(x=np.mean(y[adv_idx]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
 
-  plt.xlim(0,4)
+  # plt.xlim(0,4)
   plt.xticks(fontsize=14)
   plt.yticks(fontsize=14)
   plt.xlabel('College GPA (4.0 scale)', fontsize=14)
