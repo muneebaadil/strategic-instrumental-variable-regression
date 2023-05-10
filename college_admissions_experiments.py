@@ -592,7 +592,17 @@ def run_experiment(args, i):
     # estimates_list_mean.append(estimates_list[np.newaxis])
     # error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
-    pass # record nothing in case the algorithm fails.  
+    pass # record nothing in case the algorithm fails. 
+    # return an array of nan.
+    if args.stream:
+      upp_limits = [x for x in range(args.applicants_per_round*2, args.num_applicants+1, 2)]
+    else:
+      upp_limits = [args.num_applicants]
+    estimates_list = np.empty(shape=(len(upp_limits), 3, 2))
+    error_list = np.empty(shape=(len(upp_limits), 3))
+    estimates_list[:] = np.nan
+    error_list[:] = np.nan
+    return estimates_list[np.newaxis], error_list[np.newaxis]
   
 
 # %% 
