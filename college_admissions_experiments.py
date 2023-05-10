@@ -134,7 +134,18 @@ def get_selection(y_hat):
 def generate_theta(args):
   if args.admit_all: # harris et. al settings. 
     theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],args.num_applicants)
-  else:
+    return theta 
+  else: # selection. in our settings, require theta to be repeating across a batch of students.
+
+    assert args.num_applicants % args.applicants_per_round == 0
+    n_rounds = int(args.num_applicants / args.applicants_per_round)
+    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+
+    # theta repeating over the rounds.
+    theta = np.repeat(theta, repeats=args.applicants_per_round, axis=0)
+    assert theta.shape[0] == args.num_applicants
+
+    return theta
     raise NotImplementedError()
     assert num_applicants % applicants_per_round == 0
     n_rounds = int(num_applicants / applicants_per_round)
@@ -161,7 +172,7 @@ def generate_theta(args):
     # theta repeating over the rounds.
     theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
     assert theta.shape[0] == num_applicants
-  return theta
+
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
@@ -337,7 +348,6 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     y_round_admitted = y_round[w_round==1]
     theta_round_admitted = theta_round[w_round==1] 
 
-
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     try:
@@ -346,9 +356,10 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
       tsls_estimate = np.empty(shape=(2,))
       tsls_estimate[:] = np.nan
     # our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    our_estimate = np.empty(shape=(2,))
-    our_estimate[:] = np.nan
-    estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
+    # our_estimate = np.empty(shape=(2,))
+    # our_estimate[:] = np.nan
+    our_estimate = np.array([np.nan, np.nan])
+    estimates_list[i,:] += [ols_estimate,tsls_estimate, our_estimate]
 
     # check if EE.T estimate is identical
     # if args.admit_all:
