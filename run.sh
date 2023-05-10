@@ -1,15 +1,5 @@
-# motivation experiments
-ROUNDS=(2 10 100 500 1000)
-for round in "${ROUNDS[@]}"; do
-    # selection
-    python college_admissions_experiments.py --num-applicants 10000 --num-repeat 10 \
-    --applicants-per-round ${round} --experiment-name "tsls-round${round}-admitsome" \
-    --experiment-root experiments/motivation-new --generate 2
+# harris et. al settings. (clipping yes, selection no, random conversion matrix)
+python college_admissions_experiments.py --n-cores 1 --num-repeat 10 --num-applicants 10000 --admit-all --applicants-per-round 1 --clip --experiment-root experiments --experiment-name clipped-yes-selection-yes-random-effort-matrix-d1-algo --stream
 
-    # no selection
-    # for round 1, this is the origianl tsls settings.
-    python college_admissions_experiments.py --num-applicants 10000 --num-repeat 10 \
-    --admit-all --applicants-per-round ${round} --experiment-name "tsls-round${round}-admitall" \
-    --experiment-root experiments/motivation-new --generate 2
-
-done
+# harris et. al + selection (clipping yes, selection yes, random conversion matrix) 
+# need round parameters. 

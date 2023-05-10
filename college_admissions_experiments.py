@@ -22,17 +22,21 @@ def get_git_revision_hash() -> str:
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--n-cores', default=1, type=int)
-parser.add_argument('--num-applicants', default=10000, type=int)
+
+# dataset
 parser.add_argument('--num-repeat', default=10, type=int)
-parser.add_argument('--test-run', action='store_true')
+parser.add_argument('--num-applicants', default=10000, type=int)
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 parser.add_argument('--fixed-effort-conversion', action='store_true')
 parser.add_argument('--scaled-duplicates', default='random', choices=['random', 'sequence'], type=str)
-parser.add_argument('--points-thres', default=10, type=int)
-parser.add_argument('--sample-weights', action='store_true')
 parser.add_argument('--clip', action='store_true')
+
+# algorithm
+parser.add_argument('--sample-weights', action='store_true')
+
 # experiment
+parser.add_argument('--test-run', action='store_true')
 parser.add_argument('--experiment-root', type=str, default='experiments')
 parser.add_argument('--experiment-name', type=str)
 
@@ -77,10 +81,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   adv_idx = idx[half:]
 
   mean_sat_disadv = 800
-  mean_sat_adv = 1200 
+  mean_sat_adv = 1000 
 
   mean_gpa_disadv = 1.8
-  mean_gpa_adv = 5 
+  mean_gpa_adv = 2.2 
 
   # disadvantaged students
   b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
@@ -127,7 +131,37 @@ def get_selection(y_hat):
     w[i] = np.random.binomial(n=1, p=prob)
   return w
 
+def generate_theta(args):
+  if args.admit_all: # harris et. al settings. 
+    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],args.num_applicants)
+  else:
+    raise NotImplementedError()
+    assert num_applicants % applicants_per_round == 0
+    n_rounds = int(num_applicants / applicants_per_round)
+    # theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
 
+    theta = generate_theta()
+    assert n_rounds % 2 == 0
+    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
+  
+    # scaled duplicate of each theta. 
+    scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
+    scale = np.diag(v=scale)
+    theta_scaled = scale.dot(theta)
+  
+    if args.scaled_duplicates=='random':
+      theta = np.concatenate((theta, theta_scaled))
+      np.random.shuffle(theta)
+    else:
+      theta_temp = np.zeros((n_rounds,m))
+      theta_temp[0::2] = theta
+      theta_temp[1::2] = theta_scaled
+      theta = theta_temp
+  
+    # theta repeating over the rounds.
+    theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
+    assert theta.shape[0] == num_applicants
+  return theta
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
   m = theta_star.size
@@ -140,32 +174,9 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
 
   # assessment rule 
+  theta = generate_theta(args)
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
-  # theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
-
-
-  assert n_rounds % 2 == 0
-  theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
-  
-  # scaled duplicate of each theta. 
-  # TODO: ablation study?
-  scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
-  scale = np.diag(v=scale)
-  theta_scaled = scale.dot(theta)
-  
-  if args.scaled_duplicates=='random':
-    theta = np.concatenate((theta, theta_scaled))
-    np.random.shuffle(theta)
-  else:
-    theta_temp = np.zeros((n_rounds,m))
-    theta_temp[0::2] = theta
-    theta_temp[1::2] = theta_scaled
-    theta = theta_temp
-  
-  # theta repeating over the rounds.
-  theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
-  assert theta.shape[0] == num_applicants
 
   # effort conversion matrices
   EW = np.array([[10.0,0],[0,1.0]])
@@ -334,9 +345,9 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     except np.linalg.LinAlgError:
       tsls_estimate = np.empty(shape=(2,))
       tsls_estimate[:] = np.nan
-    our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    # our_estimate = np.empty(shape=(2,))
-    # our_estimate[:] = np.nan
+    # our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    our_estimate = np.empty(shape=(2,))
+    our_estimate[:] = np.nan
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
 
     # check if EE.T estimate is identical
