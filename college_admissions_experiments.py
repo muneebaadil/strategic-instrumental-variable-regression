@@ -395,12 +395,12 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
-    # if args.estimator == 'inverse':
-    #   our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    # elif args.estimator == 'regression':
-    #   our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    our_estimate = np.empty(shape=(2,))
-    our_estimate[:] = np.nan
+    if args.estimator == 'inverse':
+      our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    elif args.estimator == 'regression':
+      our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    # our_estimate = np.empty(shape=(2,))
+    # our_estimate[:] = np.nan
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
 
     # check if EE.T estimate is identical
@@ -428,92 +428,70 @@ def plot_data(data, condition, name='dataset.pdf'):
   plt.savefig(os.path.join(dirname, name))
   plt.close()
 
-def plot_features(x, z, adv_idx, disadv_idx, fname):
+def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
   ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
-  fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2,figsize=(12,10)) #constrained_layout=False
-
-  ### first-gen HS GPA
+  fig, ((ax1, ax2)) = plt.subplots(nrows=2, sharex=True)
   ax1.hist(x[disadv_idx,1],bins='auto', label='after manipulation', color='darkorange')
-
   ax1.axvline(x=np.mean(x[disadv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
-
   ax1.set_title("observable high school GPA (x1)")
   ax1.set(ylabel='Number of applicants')
-
   ax1.hist(z[disadv_idx,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
   ax1.axvline(x=np.mean(z[disadv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
-
   ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
   # ax1.set_xlim(0,4)
   ax1.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
   ax1.set_ylabel('Number of applicants',fontsize=14)
   ax1.tick_params(axis="x", labelsize=14)
   ax1.tick_params(axis="y", labelsize=14)
-
   ax1.legend()
 
+  ax2.hist(x[adv_idx,1],bins='auto', label='after manipulation', color='green')
+  ax2.hist(z[adv_idx,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax2.axvline(x=np.mean(z[adv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax2.axvline(x=np.mean(x[adv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
+
+  ax2.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
+  # ax2.set_xlim(0,4)
+  ax2.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
+  ax2.set_ylabel('Number of applicants',fontsize=14)
+  ax2.tick_params(axis="x", labelsize=14)
+  ax2.tick_params(axis="y", labelsize=14)
+  ax2.legend()
+  fig.tight_layout()
+  fname = os.path.join(dirname, f'{fname}')
+  plt.savefig(fname, dpi=500)
+  plt.close()
+
+  fig,((ax1, ax2)) = plt.subplots(nrows=2, sharex=True)
   ### 2) first-gen SAT
-  ax2.hist(x[disadv_idx,0], bins='auto', label='after manipulation', color='orange')
-  ax2.axvline(x=np.mean(x[disadv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
-
-  ax2.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
-  ax2.hist(z[disadv_idx,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
-  ax2.axvline(x=np.mean(z[disadv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-
-  ax2.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
-  # ax2.set_xlim(400,1600)
+  ax1.hist(x[disadv_idx,0], bins='auto', label='after manipulation', color='orange')
+  ax1.axvline(x=np.mean(x[disadv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
+  ax1.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
+  ax1.hist(z[disadv_idx,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax1.axvline(x=np.mean(z[disadv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax1.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
+  ax1.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
+  ax1.set_ylabel('Number of applicants',fontsize=14)
+  ax1.tick_params(axis="x", labelsize=14)
+  ax1.tick_params(axis="y", labelsize=14)
+  ax1.legend(loc='upper left', fontsize=14)
+  ax1.legend()
+  ### 4) non-first-gen SAT
+  ax2.hist(x[adv_idx,0], bins='auto', label='after manipulation', color='green')
+  ax2.hist(z[adv_idx,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax2.axvline(x=np.mean(z[adv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
+  ax2.axvline(x=np.mean(x[adv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
+  ax2.set_title("Advantaged SAT before & after manipulation", fontsize=13)
   ax2.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
   ax2.set_ylabel('Number of applicants',fontsize=14)
   ax2.tick_params(axis="x", labelsize=14)
   ax2.tick_params(axis="y", labelsize=14)
 
-  #ax2.legend(loc='upper left', fontsize=14)
-  ax2.legend()
-
-  ### 3) non-first-gen HS GPA
-  ax3.hist(x[adv_idx,1],bins='auto', label='after manipulation', color='green')
-  ax3.hist(z[adv_idx,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-  ax3.axvline(x=np.mean(z[adv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax3.axvline(x=np.mean(x[adv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
-
-  ax3.set_title("Advantaged HS GPA before & after manipulation", fontsize=13)
-  # ax3.set_xlim(0,4)
-  ax3.set_xlabel('High school GPA (4.0 scale)',fontsize=14)
-  ax3.set_ylabel('Number of applicants',fontsize=14)
-  ax3.tick_params(axis="x", labelsize=14)
-  ax3.tick_params(axis="y", labelsize=14)
-  ax3.legend()
-
-  ### 4) non-first-gen SAT
-  ax4.hist(x[adv_idx,0], bins='auto', label='after manipulation', color='green')
-  ax4.hist(z[adv_idx,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
-  ax4.axvline(x=np.mean(z[adv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
-  ax4.axvline(x=np.mean(x[adv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
-
-  ax4.set_title("Advantaged SAT before & after manipulation", fontsize=13)
-  # ax4.set_xlim(400,1600)
-  ax4.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
-  ax4.set_ylabel('Number of applicants',fontsize=14)
-  ax4.tick_params(axis="x", labelsize=14)
-  ax4.tick_params(axis="y", labelsize=14)
-
   #ax4.legend(bbox_to_anchor=(-3, 0), loc='upper left', fontsize=14,ncol=4)
-  ax4.legend()
-
-  ## legend
-  pre_fg = Patch(color='yellow', label='disadvantaged unobserved (unmanipulated)', alpha=0.75)
-  post_fg = Patch(color='darkorange', label='disadvantaged observed (manipulated)')
-
-  pre_ls = Patch(color='lightgreen', label='legacy unobserved (unmanipulated)', alpha=0.75)
-  post_ls = Patch(color='green', label='legacy observed (manipulated)')
-
-  before_mean = Line2D([0], [0], color='blue', linestyle='--', lw=2, label='mean before manipulation')
-  after_mean = Line2D([0], [0], color='red', linestyle='--', lw=2, label='mean after manipulation')
-
+  ax2.legend()
   fig.tight_layout()
-
-  fname = os.path.join(dirname, f'{fname}')
-  plt.savefig(fname, dpi=500)
+  fname2 = os.path.join(dirname, f'{fname2}')
+  plt.savefig(fname2, dpi=500)
   plt.close()
 
 def plot_error_estimate(error_list_mean):
@@ -596,7 +574,7 @@ def run_experiment(args, i):
   # plot data.
   plot_data(y, w, f'outcome_select_d{i}.png')
   plot_data(y_hat, w, f'outcome_pred_select_d{i}.png')
-  plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}.png')
+  plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
 
   try:
