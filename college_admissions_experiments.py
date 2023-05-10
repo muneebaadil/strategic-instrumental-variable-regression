@@ -77,13 +77,19 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   disadv_idx = idx[:half]
   adv_idx = idx[half:]
 
+  mean_sat_disadv = 800
+  mean_sat_adv = 1200
+
+  mean_gpa_disadv = 1.8
+  mean_gpa_adv = 5
+
   # disadvantaged students
-  b[disadv_idx,0] = np.random.normal(mean_sat-100,sigma_sat,b[disadv_idx][:,0].shape) #SAT
-  b[disadv_idx,1] = np.random.normal(mean_gpa-.2,sigma_gpa,b[disadv_idx][:,1].shape) #GPA
+  b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
+  b[disadv_idx,1] = np.random.normal(mean_gpa_disadv,sigma_gpa,b[disadv_idx][:,1].shape) #GPA
 
   # advantaged students
-  b[adv_idx,0] = np.random.normal(mean_sat+100,sigma_sat,b[adv_idx][:,0].shape) #SAT
-  b[adv_idx,1] = np.random.normal(mean_gpa+.2,sigma_gpa,b[adv_idx][:,1].shape) #GPA
+  b[adv_idx,0] = np.random.normal(mean_sat_adv,sigma_sat,b[adv_idx][:,0].shape) #SAT
+  b[adv_idx,1] = np.random.normal(mean_gpa_adv,sigma_gpa,b[adv_idx][:,1].shape) #GPA
 
   if args.clip:
     b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
@@ -587,6 +593,7 @@ def run_experiment(args, i):
     # error_list_mean.append(error_list[np.newaxis])
   except np.linalg.LinAlgError:
     pass # record nothing in case the algorithm fails.  
+  
 
 # %% 
 import pickle as pkl
