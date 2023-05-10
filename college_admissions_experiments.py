@@ -78,10 +78,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   adv_idx = idx[half:]
 
   mean_sat_disadv = 800
-  mean_sat_adv = 1200
+  mean_sat_adv = 1200 
 
   mean_gpa_disadv = 1.8
-  mean_gpa_adv = 5
+  mean_gpa_adv = 5 
 
   # disadvantaged students
   b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
@@ -400,7 +400,11 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
 
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
-    tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
+    try:
+      tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
+    except np.linalg.LinAlgError:
+      tsls_estimate = np.empty(shape=(2,))
+      tsls_estimate[:] = np.nan
     if args.estimator == 'inverse':
       our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
     elif args.estimator == 'regression':
