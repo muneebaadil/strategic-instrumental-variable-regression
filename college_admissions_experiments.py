@@ -31,7 +31,6 @@ parser.add_argument('--fixed-effort-conversion', action='store_true')
 parser.add_argument('--scaled-duplicates', default='random', choices=['random', 'sequence'], type=str)
 parser.add_argument('--points-thres', default=10, type=int)
 parser.add_argument('--sample-weights', action='store_true')
-parser.add_argument('--estimator', required=True, type=str, choices=['inverse', 'regression'])
 parser.add_argument('--clip', action='store_true')
 # experiment
 parser.add_argument('--experiment-root', type=str, default='experiments')
@@ -304,76 +303,6 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
   theta_star_est = m.coef_ 
   return theta_star_est
 #%%
-def our(x, y, theta, w, b, o, effort_conversion_matrix):
-  E = effort_conversion_matrix
-  model = LinearRegression()
-  model.fit(theta, x)
-  omega_hat_ = model.coef_.T # EET estimate. 
-
-  # recover scaled duplicate 
-  theta_admit = theta[w==1]
-  theta_admit_, counts = np.unique(theta_admit, axis=0, return_counts=True)
-  # to use thetas having the most number of applicants
-  idx = np.argsort(counts); idx = idx[::-1]
-  theta_admit_ = theta_admit_[idx]
-
-  assert b.shape[0] == theta.shape[0]
-  assert o.shape[0] == theta.shape[0]
-  b_admit, o_admit = b[w==1], o[w==1]
-  
-  # construct linear system of eqs.
-  assert theta_admit.shape[1] > 1 # algo not applicable for only one feature.
-  n_eqs_required = theta_admit.shape[1]
-
-  curr_n_eqs = 0
-  B = np.zeros((n_eqs_required,))
-  A = np.zeros((n_eqs_required, n_eqs_required))
-
-  i = 0
-  while (i < theta_admit_.shape[0]) and curr_n_eqs < n_eqs_required:
-    j = i+1
-    while (j < theta_admit_.shape[0]) and (curr_n_eqs < n_eqs_required):
-      pair = theta_admit_[[i,j]]
-
-      if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
-        A[curr_n_eqs, :] = (pair[1] - pair[0]).dot(omega_hat_)
-
-        idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
-        idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
-        est1 = y[idx_grp1].mean()
-        est0 = y[idx_grp0].mean()
-        B[curr_n_eqs] = est1 - est0
-
-        curr_n_eqs += 1
-
-        l1 = b_admit[idx_grp1].dot(theta_star)
-        l2 = o_admit[idx_grp1]
-        eqs_data['grp1_y'].append(est1)
-        eqs_data['grp1_b'].append(l1.tolist()); eqs_data['grp1_b_mean'].append(l1.mean())
-        eqs_data['grp1_o'].append(l2.tolist()); eqs_data['grp1_o_mean'].append(l2.mean())
-        eqs_data['grp1_theta'].append(pair[1].dot(E.dot(E.T)).dot(theta_star))
-        eqs_data['grp1_theta_hat'].append(pair[1].dot(omega_hat_).dot(theta_star))
-
-        l1 = b_admit[idx_grp0].dot(theta_star)
-        l2 = o_admit[idx_grp0]
-        eqs_data['grp0_y'].append(est0)
-        eqs_data['grp0_b'].append(l1.tolist()); eqs_data['grp0_b_mean'].append(l1.mean())
-        eqs_data['grp0_o'].append(l2.tolist()); eqs_data['grp0_o_mean'].append(l2.mean())
-        eqs_data['grp0_theta'].append(pair[0].dot(E.dot(E.T)).dot(theta_star))
-        eqs_data['grp0_theta_hat'].append(pair[0].dot(omega_hat_).dot(theta_star))
-
-      j += 1
-    i += 1 
-
-  if curr_n_eqs < n_eqs_required:
-    out = np.empty(shape=(n_eqs_required,))
-    out[:] = np.nan
-    return out
-
-  theta_star_est = np.linalg.inv(A).dot(B)
-  return theta_star_est
-
-
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
   if args.stream:
@@ -405,10 +334,7 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     except np.linalg.LinAlgError:
       tsls_estimate = np.empty(shape=(2,))
       tsls_estimate[:] = np.nan
-    if args.estimator == 'inverse':
-      our_estimate = our(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    elif args.estimator == 'regression':
-      our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
+    our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
     # our_estimate = np.empty(shape=(2,))
     # our_estimate[:] = np.nan
     estimates_list[i,:] += [ols_estimate,tsls_estimate,our_estimate]
