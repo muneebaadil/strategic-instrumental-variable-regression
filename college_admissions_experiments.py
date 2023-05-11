@@ -153,7 +153,7 @@ def generate_theta(args):
         theta = np.concatenate((theta, theta_scaled))
         np.random.shuffle(theta)
       elif args.scaled_duplicates=='sequence':
-        theta_temp = np.zeros((n_rounds,m))
+        theta_temp = np.zeros((n_rounds,2))
         theta_temp[0::2] = theta
         theta_temp[1::2] = theta_scaled
         theta = theta_temp
@@ -525,26 +525,11 @@ def run_experiment(args, i):
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
 
-  try:
-    if args.generate == 1:
-      [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o, EW)
-    # else:
-    #   [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
-    return estimates_list[np.newaxis], error_list[np.newaxis]
-    # estimates_list_mean.append(estimates_list[np.newaxis])
-    # error_list_mean.append(error_list[np.newaxis])
-  except np.linalg.LinAlgError:
-    pass # record nothing in case the algorithm fails. 
-    # return an array of nan.
-    if args.stream:
-      upp_limits = [x for x in range(args.applicants_per_round*2, args.num_applicants+1, 2)]
-    else:
-      upp_limits = [args.num_applicants]
-    estimates_list = np.empty(shape=(len(upp_limits), 3, 2))
-    error_list = np.empty(shape=(len(upp_limits), 3))
-    estimates_list[:] = np.nan
-    error_list[:] = np.nan
-    return estimates_list[np.newaxis], error_list[np.newaxis]
+  if args.generate == 1:
+    [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o, EW)
+  # else:
+  #   [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+  return estimates_list[np.newaxis], error_list[np.newaxis]
   
 
 # %% 
