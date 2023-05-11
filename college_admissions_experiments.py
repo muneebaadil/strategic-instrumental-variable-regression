@@ -29,7 +29,7 @@ parser.add_argument('--num-applicants', default=10000, type=int)
 parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 parser.add_argument('--fixed-effort-conversion', action='store_true')
-parser.add_argument('--scaled-duplicates', default='random', choices=['random', 'sequence'], type=str)
+parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
 parser.add_argument('--clip', action='store_true')
 
 # algorithm
@@ -136,42 +136,32 @@ def generate_theta(args):
     theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],args.num_applicants)
     return theta 
   else: # selection. in our settings, require theta to be repeating across a batch of students.
-
     assert args.num_applicants % args.applicants_per_round == 0
     n_rounds = int(args.num_applicants / args.applicants_per_round)
-    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+
+    if args.scaled_duplicates is None: # random vectors for every round
+      theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+    else: # making sure there exists a scaled duplicate of each theta per round
+      theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
+  
+      # scaled duplicate of each theta. 
+      scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
+      scale = np.diag(v=scale)
+      theta_scaled = scale.dot(theta)
+  
+      if args.scaled_duplicates=='random':
+        theta = np.concatenate((theta, theta_scaled))
+        np.random.shuffle(theta)
+      elif args.scaled_duplicates=='sequence':
+        theta_temp = np.zeros((n_rounds,m))
+        theta_temp[0::2] = theta
+        theta_temp[1::2] = theta_scaled
+        theta = theta_temp
 
     # theta repeating over the rounds.
     theta = np.repeat(theta, repeats=args.applicants_per_round, axis=0)
     assert theta.shape[0] == args.num_applicants
-
     return theta
-    raise NotImplementedError()
-    assert num_applicants % applicants_per_round == 0
-    n_rounds = int(num_applicants / applicants_per_round)
-    # theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
-
-    theta = generate_theta()
-    assert n_rounds % 2 == 0
-    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
-  
-    # scaled duplicate of each theta. 
-    scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
-    scale = np.diag(v=scale)
-    theta_scaled = scale.dot(theta)
-  
-    if args.scaled_duplicates=='random':
-      theta = np.concatenate((theta, theta_scaled))
-      np.random.shuffle(theta)
-    else:
-      theta_temp = np.zeros((n_rounds,m))
-      theta_temp[0::2] = theta
-      theta_temp[1::2] = theta_scaled
-      theta = theta_temp
-  
-    # theta repeating over the rounds.
-    theta = np.repeat(theta, repeats=applicants_per_round, axis=0)
-    assert theta.shape[0] == num_applicants
 
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
   half = int(num_applicants/2) 
@@ -564,6 +554,8 @@ experiment_name = time.strftime('%Y%m%d-%H%H%S') if args.experiment_name is None
 
 if not args.test_run:
   dirname = os.path.join(args.experiment_root, f'{experiment_name}')
+  if os.path.exists(dirname):
+    dirname = f"{dirname}_"
 else:
   dirname = os.path.join(args.experiment_root, f'test-run')
   if os.path.exists(dirname):
