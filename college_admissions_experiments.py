@@ -343,19 +343,9 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     try:
       tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
-      tsls_estimate = np.empty(shape=(2,))
-      tsls_estimate[:] = np.nan
-    # our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
-    # our_estimate = np.empty(shape=(2,))
-    # our_estimate[:] = np.nan
-    our_estimate = np.array([np.nan, np.nan])
+      tsls_estimate = np.array([np.nan, np.nan])
+    our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
     estimates_list[i,:] += [ols_estimate,tsls_estimate, our_estimate]
-
-    # check if EE.T estimate is identical
-    # if args.admit_all:
-    #   assert np.all(x_round_admitted == x_round)
-    #   assert np.all(theta_round_admitted == theta_round)
-    #   assert np.all(o1==o2)
 
     # errors
     ols_error = np.linalg.norm(theta_star-ols_estimate)
