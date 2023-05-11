@@ -31,6 +31,10 @@ parser.add_argument('--applicants-per-round', default=1, type=int, help='used fo
 parser.add_argument('--fixed-effort-conversion', action='store_true')
 parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
 parser.add_argument('--clip', action='store_true')
+parser.add_argument('--o-bias', default=1, type=float)
+parser.add_argument('--b1bias', default=200, type=float)
+parser.add_argument('--b2bias', default=0.4, type=float)
+
 
 # algorithm
 parser.add_argument('--sample-weights', action='store_true')
@@ -81,10 +85,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   adv_idx = idx[half:]
 
   mean_sat_disadv = 800
-  mean_sat_adv = 1000 
+  mean_sat_adv = mean_sat_disadv + args.b1bias 
 
   mean_gpa_disadv = 1.8
-  mean_gpa_adv = 2.2 
+  mean_gpa_adv = mean_gpa_disadv + args.b2bias 
 
   # disadvantaged students
   b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
@@ -99,8 +103,8 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
     b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
-  g = np.ones(n_samples)*0.5 # legacy students shifted up
-  g[disadv_idx]=-0.5 # first-gen students shifted down
+  g = np.ones(n_samples)*0.5  * args.o_bias # legacy students shifted up
+  g[disadv_idx]=-0.5 * args.o_bias # first-gen students shifted down
   g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
 
   return b, g, adv_idx, disadv_idx
