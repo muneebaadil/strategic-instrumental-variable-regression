@@ -322,7 +322,7 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
   if args.stream:
-    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, 2)]
+    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
   else:
     upp_limits = [num_applicants]
   estimates_list = np.zeros([len(upp_limits),3,2])
@@ -460,9 +460,9 @@ def plot_error_estimate(error_list_mean):
   plt.xlabel('iterations', fontsize=14)
   plt.ylabel(r'$|| \hat{\theta} - \theta^* ||$', fontsize=14)
 
-  upp_limits = range(args.applicants_per_round*2, args.num_applicants+1, 2)
-  _upp_limits = range(len(upp_limits))
-  plt.plot(_upp_limits, 1/(np.sqrt(_upp_limits) + 1e-9), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
+  assert error_list_mean.ndim == 3
+  x = [x for x in range(error_list_mean.shape[1])]
+  plt.plot(x, 1/(np.sqrt(x) + 1e-9), color='red',linestyle='dashed', linewidth=2, label='1/sqrt(T)')
 
   plt.legend(fontsize=14)
   #plt.legend(bbox_to_anchor=(1, 1), loc='upper left')
