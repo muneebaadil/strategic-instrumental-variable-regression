@@ -109,7 +109,7 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   return b, g, adv_idx, disadv_idx
 
 def scale(v, a_new, b_new):
-  a, b = v.max(), v.min()
+  a, b = v.min(), v.max()
   r = b - a
   r_new = b_new - a_new
   return (((v - a) / r) * r_new) + a_new
@@ -384,11 +384,11 @@ def plot_data(data, condition, name='dataset.pdf'):
 def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
   ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
   fig, ((ax1, ax2)) = plt.subplots(nrows=2, sharex=True)
-  ax1.hist(x[disadv_idx,1],bins='auto', label='after manipulation', color='darkorange')
+  ax1.hist(x[disadv_idx,1],bins=1000, label='after manipulation', color='darkorange')
   ax1.axvline(x=np.mean(x[disadv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # before mean
   ax1.set_title("observable high school GPA (x1)")
   ax1.set(ylabel='Number of applicants')
-  ax1.hist(z[disadv_idx,1], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax1.hist(z[disadv_idx,1], bins=1000, label='before manipulation', color='yellow', alpha=0.75)
   ax1.axvline(x=np.mean(z[disadv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before manipulation
   ax1.set_title("Disadvantaged HS GPA before & after manipulation", fontsize=14)
   # ax1.set_xlim(0,4)
@@ -398,8 +398,8 @@ def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
   ax1.tick_params(axis="y", labelsize=14)
   ax1.legend()
 
-  ax2.hist(x[adv_idx,1],bins='auto', label='after manipulation', color='green')
-  ax2.hist(z[adv_idx,1], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax2.hist(x[adv_idx,1],bins=1000, label='after manipulation', color='green')
+  ax2.hist(z[adv_idx,1], bins=1000, label='before manipulation', color='lightgreen', alpha=0.75)
   ax2.axvline(x=np.mean(z[adv_idx,1]), color='blue', linestyle='--', label='mean before manipulation') # before mean
   ax2.axvline(x=np.mean(x[adv_idx,1]), color='red', linestyle='--', label='mean after manipulation') # after mean
 
@@ -417,10 +417,10 @@ def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
 
   fig,((ax1, ax2)) = plt.subplots(nrows=2, sharex=True)
   ### 2) first-gen SAT
-  ax1.hist(x[disadv_idx,0], bins='auto', label='after manipulation', color='orange')
+  ax1.hist(x[disadv_idx,0], bins=1000, label='after manipulation', color='orange')
   ax1.axvline(x=np.mean(x[disadv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # after mean
   ax1.set(xlabel='GPA (4.0 scale)', ylabel='Number of applicants')
-  ax1.hist(z[disadv_idx,0], bins='auto', label='before manipulation', color='yellow', alpha=0.75)
+  ax1.hist(z[disadv_idx,0], bins=1000, label='before manipulation', color='yellow', alpha=0.75)
   ax1.axvline(x=np.mean(z[disadv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
   ax1.set_title("Disadvantaged SAT before & after manipulation", fontsize=14)
   ax1.set_xlabel('SAT score (400 to 1600 points)',fontsize=14)
@@ -430,8 +430,8 @@ def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
   ax1.legend(loc='upper left', fontsize=14)
   ax1.legend()
   ### 4) non-first-gen SAT
-  ax2.hist(x[adv_idx,0], bins='auto', label='after manipulation', color='green')
-  ax2.hist(z[adv_idx,0], bins='auto', label='before manipulation', color='lightgreen', alpha=0.75)
+  ax2.hist(x[adv_idx,0], bins=1000, label='after manipulation', color='green')
+  ax2.hist(z[adv_idx,0], bins=1000, label='before manipulation', color='lightgreen', alpha=0.75)
   ax2.axvline(x=np.mean(z[adv_idx,0]), color='blue', linestyle='--', label='mean before manipulation') # before mean
   ax2.axvline(x=np.mean(x[adv_idx,0]), color='red', linestyle='--', label='mean after manipulation') # before mean
   ax2.set_title("Advantaged SAT before & after manipulation", fontsize=13)
