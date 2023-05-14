@@ -227,7 +227,7 @@ def ols(x,y):
   theta_hat_ols_ = model.coef_
   return theta_hat_ols_
   
-def tsls(x,y,theta): # runs until round T
+def tsls(x,y,theta, w): # runs until round T
   # my implementation
   # regress x onto theta: estimate omega
   model = LinearRegression()
@@ -235,8 +235,9 @@ def tsls(x,y,theta): # runs until round T
   omega_hat_ = model.coef_.T
 
   # regress y onto theta: estimate lambda
+  theta_admit = theta[w==1]
   model = LinearRegression()
-  model.fit(theta, y)
+  model.fit(theta_admit, y)
   lambda_hat_ = model.coef_ 
 
   # estimate theta^* 
@@ -345,7 +346,7 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     try:
-      tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
+      tsls_estimate = tsls(x_round, y_round_admitted, theta_round, w_round) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
       tsls_estimate = np.array([np.nan, np.nan])
     our_estimate = our2(x_round, y_round_admitted, theta_round, w_round, b_round, o_round, EW)
