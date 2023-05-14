@@ -30,14 +30,10 @@ parser.add_argument('--admit-all', action='store_true', help='admit all students
 parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
 parser.add_argument('--fixed-effort-conversion', action='store_true')
 parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
-parser.add_argument('--clip', action='store_true')
+parser.add_argument('--post-proc', type=str, default='none', choices=['none', 'clip', 'scale'])
 parser.add_argument('--o-bias', default=1, type=float)
 parser.add_argument('--b1bias', default=200, type=float)
 parser.add_argument('--b2bias', default=0.4, type=float)
-
-
-# algorithm
-parser.add_argument('--sample-weights', action='store_true')
 
 # experiment
 parser.add_argument('--test-run', action='store_true')
@@ -98,9 +94,12 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   b[adv_idx,0] = np.random.normal(mean_sat_adv,sigma_sat,b[adv_idx][:,0].shape) #SAT
   b[adv_idx,1] = np.random.normal(mean_gpa_adv,sigma_gpa,b[adv_idx][:,1].shape) #GPA
 
-  if args.clip:
+  if args.post_proc=='clip':
     b[:,0] = np.clip(b[:,0],400,1600) # clip to 400 to 1600
     b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
+  # elif args.post_proc=='scale':
+    # b[:,0] = scale(b[:,0],400,1600)
+    # b[:,1] = scale(b[:,1],0,4)
 
   # confounding error term g (error on true college GPA)
   g = np.ones(n_samples)*0.5  * args.o_bias # legacy students shifted up
@@ -109,6 +108,12 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
 
   return b, g, adv_idx, disadv_idx
 
+def scale(v, a_new, b_new):
+  a, b = v.max(), v.min()
+  r = b - a
+  r_new = b_new - a_new
+  return (((v - a) / r) * r_new) + a_new
+
 def compute_xt(EWi, b, theta):
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[0]
@@ -116,13 +121,16 @@ def compute_xt(EWi, b, theta):
   n_applicants = b.shape[0]
 
   x = np.zeros([n_applicants,b.shape[1]])
-  # TODO: vectorize this?
   for i in range(n_applicants):
     x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
 
-  if args.clip:
+  if args.post_proc=='clip':
     x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
     x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
+  
+  elif args.post_proc=='scale':
+    x[:,0] = scale(x[:,0], 400, 1600)
+    x[:,1] = scale(x[:,1], 0, 4 )
   return x
 
 def get_selection(y_hat):
@@ -193,8 +201,10 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # true outcomes (college gpa)
   # y = np.clip() # clipped outcomes
   y = np.matmul(x,theta_star) + g
-  if args.clip:
+  if args.post_proc=='clip':
     y = np.clip(y, 0, 4)
+  elif args.post_proc=='scale':
+    y = scale(y, 0, 4)
   
   # our setup addition 
   # computing admission results.
