@@ -102,10 +102,13 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
     # b[:,1] = scale(b[:,1],0,4)
 
   # confounding error term g (error on true college GPA)
-  g = np.ones(n_samples)*0.5  * args.o_bias # legacy students shifted up
-  g[disadv_idx]=-0.5 * args.o_bias # first-gen students shifted down
-  g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
+  # g = np.ones(n_samples)*0.5  * args.o_bias # legacy students shifted up
+  # g[disadv_idx]=-0.5 * args.o_bias # first-gen students shifted down
+  # g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
 
+  g = np.zeros(shape=(n_samples,))
+  g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=half)
+  g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=half)
   return b, g, adv_idx, disadv_idx
 
 def scale(v, a_new, b_new):
