@@ -176,7 +176,8 @@ def generate_theta(args):
     return theta
 
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
-  theta_star = np.ones((args.num_envs,1)).dot(np.array([[0, 0.5]]))
+  theta_star = np.zeros(shape=(args.num_envs, 2))
+  theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
 
   mean_sat = 900
   mean_gpa = 2
