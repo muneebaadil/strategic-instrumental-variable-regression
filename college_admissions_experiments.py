@@ -185,6 +185,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   if args.pref == 'uniform':
       pref_vect = np.ones(shape=(args.num_envs,))
+      pref_vect = pref_vect / np.sum(pref_vect)
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
 
   # assessment rule 
