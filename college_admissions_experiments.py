@@ -35,7 +35,8 @@ parser.add_argument('--b-bias', type=float, default=1.25)
 
 # multienv
 parser.add_argument('--num-envs', default=1, type=int)
-parser.add_argument('--pref',default='uniform',choices=['uniform'], type=str)
+parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
+parser.add_argument('--prob', default=0.5, type=float)
 
 # algorithm
 parser.add_argument('--sample-weights', action='store_true')
@@ -185,8 +186,11 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   sigma_gpa = 0.5
 
   if args.pref == 'uniform':
-      pref_vect = np.ones(shape=(args.num_envs,))
-      pref_vect = pref_vect / np.sum(pref_vect)
+    pref_vect = np.ones(shape=(args.num_envs,))
+    pref_vect = pref_vect / np.sum(pref_vect)
+  elif args.pref == 'geometric':
+    pref_vect = ((1 - args.prob) ** np.arange(args.num_envs)) * args.prob
+    pref_vect = pref_vect / np.sum(pref_vect)
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
 
   # assessment rule 
