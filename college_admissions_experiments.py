@@ -31,6 +31,7 @@ parser.add_argument('--applicants-per-round', default=1, type=int, help='used fo
 parser.add_argument('--fixed-effort-conversion', action='store_true')
 parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
 parser.add_argument('--clip', action='store_true')
+parser.add_argument('--b-bias', type=float, default=1.25)
 
 # algorithm
 parser.add_argument('--sample-weights', action='store_true')
@@ -81,10 +82,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   adv_idx = idx[half:]
 
   mean_sat_disadv = 800
-  mean_sat_adv = 1000 
+  mean_sat_adv = 1000
 
-  mean_gpa_disadv = 1.8
-  mean_gpa_adv = 2.2 
+  mean_gpa_disadv =  1.8
+  mean_gpa_adv = mean_gpa_disadv * args.b_bias
 
   # disadvantaged students
   b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
