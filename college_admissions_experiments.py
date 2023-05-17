@@ -234,7 +234,17 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   for env_idx in range(args.num_envs):
     w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds)
 
-  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx, g.T, theta_star
+  z = np.zeros((args.num_applicants, ))
+  for idx in range(args.num_applicants):
+    w_idx = w[:, idx]
+    if w_idx.sum() == 0: # applicant is not accepted anywhere
+      z[idx] = 0
+    else:
+      pvals = w_idx * pref_vect / (w_idx * pref_vect).sum()
+      temp = np.random.multinomial(n=1, pvals=pvals, size=1)
+      _idx = temp.flatten().nonzero()[0]
+      z[idx] = _idx+1 # offset to avoid conflict with "no uni" decision
+  return b,x,y,EW,theta, z, y_hat, adv_idx, disadv_idx, g.T, theta_star
 
 # %%
 def ols(x,y):
@@ -385,11 +395,13 @@ def plot_data(data, condition, prefix):
   condition \in (n_envs, n_applicants)
   """
   assert data.shape == (args.num_envs, args.num_applicants)
+  assert condition.shape == (args.num_applicants,)
   
   n_envs, _ = data.shape
   for env_idx in range(n_envs):
     _,ax = plt.subplots()
-    data_ , condition_ = data[env_idx], condition[env_idx]
+    data_  = data[env_idx]
+    condition_ = condition
     ax.hist(data_, bins='auto', color='green', label='all',  histtype='step')
     ax.hist(data_[condition_==0], bins='auto', color='red', label='rejected',  histtype='step')
     ax.hist(data_[condition_==1], bins='auto', color='blue', label='accepted',  histtype='step')
