@@ -253,7 +253,7 @@ def ols(x,y):
   theta_hat_ols_ = model.coef_
   return theta_hat_ols_
   
-def tsls(x,y,theta, w): # runs until round T
+def tsls(x,y,theta): # runs until round T
   # my implementation
   # regress x onto theta: estimate omega
   model = LinearRegression()
@@ -261,9 +261,8 @@ def tsls(x,y,theta, w): # runs until round T
   omega_hat_ = model.coef_.T
 
   # regress y onto theta: estimate lambda
-  theta_admit = theta[w==1]
   model = LinearRegression()
-  model.fit(theta_admit, y)
+  model.fit(theta, y)
   lambda_hat_ = model.coef_ 
 
   # estimate theta^* 
@@ -375,11 +374,12 @@ def test_params_env(num_applicants, x, y, z, theta, applicants_per_round, theta_
     # filtering out rejected students
     x_round_admitted = x_round[z_round==1]
     y_round_admitted = y_round[z_round==1]
+    theta_round_admitted = theta_round[z_round==1]
 
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     try:
-      tsls_estimate = tsls(x_round, y_round_admitted, theta_round, z_round) # 2sls w/ intercept estimate
+      tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
       tsls_estimate = np.array([np.nan, np.nan])
     # our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
@@ -638,7 +638,7 @@ with open(filename, 'wb') as f:
     }
     pkl.dump(save, f)
 
-plot_error_estimate(error_list_mean)
+# plot_error_estimate(error_list_mean)
 
 # save group data.
 filename = os.path.join(dirname, "eqs_data.json")
