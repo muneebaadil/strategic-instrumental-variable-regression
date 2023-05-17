@@ -100,13 +100,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
     b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
-  g = np.ones(n_samples)*0.5 # legacy students shifted up
-  g[disadv_idx]=-0.5 # first-gen students shifted down
-  g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
-  # args.o_bias =1 
-  # g = np.zeros(shape=(n_samples,))
-  # g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=half)
-  # g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=half)
+  args.o_bias =1 
+  g = np.zeros(shape=(n_samples,))
+  g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=half)
+  g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=half)
   return b, g, adv_idx, disadv_idx
 
 def compute_xt(EWi, b, theta):
