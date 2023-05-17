@@ -244,7 +244,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
       temp = np.random.multinomial(n=1, pvals=pvals, size=1)
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx+1 # offset to avoid conflict with "no uni" decision
-  return b,x,y,EW,theta, z, y_hat, adv_idx, disadv_idx, g.T, theta_star
+  return b,x,y,EW,theta, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, pref_vect
 
 # %%
 def ols(x,y):
@@ -325,13 +325,35 @@ def our2(x, y, theta, w):
   theta_star_est = m.coef_ 
   return theta_star_est
 #%%
-def test_params(num_applicants, x, y, z, theta, applicants_per_round, theta_star):
+def test_params(num_applicants, x, y, z, theta, applicants_per_round, theta_star, pref_vect):
   assert x.shape == (args.num_applicants,2)
   assert y.shape == (args.num_envs, args.num_applicants,)
   assert theta.shape == (args.num_envs, args.num_applicants, 2)
   assert z.shape == (args.num_applicants,)
   assert theta_star.shape == (args.num_envs, 2 )
+
+  # test_params_env(num_applicants, x, y, )
+  estimates_list_env, error_list_env = [], [] 
+
+  for env_idx in range(args.num_envs):
+    # TODO: make it multiprocessing?
+    z_env = z==(env_idx+1)
+    theta_star_env= theta_star[env_idx]
+
+    [estimates_list, error_list] = test_params_env(
+      num_applicants, x, y[env_idx],  z_env, theta, applicants_per_round, theta_star_env, env_idx, pref_vect
+    )
+    estimates_list_env.append(estimates_list)
+    error_list_env.append(error_list)
   
+  estimates_list_env, error_list_env = np.stack(estimates_list_env), np.stack(error_list_env)
+  return estimates_list_env, error_list_env # \in (num_envs, num_rounds, 3, [2])
+
+def test_params_env(num_applicants, x, y, z, theta, applicants_per_round, theta_star, env_idx, pref_vect):
+  assert y.shape == (args.num_applicants, )
+  assert z.shape == (args.num_applicants, ) 
+  assert theta_star.shape == (2,)
+
   assert args.num_envs == 1
   theta_star, theta, y = theta_star.squeeze(), theta.squeeze(), y.squeeze()
   
@@ -360,7 +382,8 @@ def test_params(num_applicants, x, y, z, theta, applicants_per_round, theta_star
       tsls_estimate = tsls(x_round, y_round_admitted, theta_round, z_round) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
       tsls_estimate = np.array([np.nan, np.nan])
-    our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
+    # our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
+    our_estimate = np.array([np.nan, np.nan])
     estimates_list[i,:] += [ols_estimate,tsls_estimate, our_estimate]
 
     # errors
@@ -531,7 +554,7 @@ def plot_outcome(y, adv_idx, disadv_idx, prefix):
 
 def run_experiment(args, i):
   np.random.seed(i)
-  b,x,y,EW, theta, z, y_hat, adv_idx, disadv_idx, o, theta_star = generate_data(
+  b,x,y,EW, theta, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect = generate_data(
     num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
     fixed_effort_conversion=args.fixed_effort_conversion
     )
@@ -540,7 +563,7 @@ def run_experiment(args, i):
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}')
 
-  [estimates_list, error_list] = test_params(args.num_applicants, x, y, z, theta, args.applicants_per_round, theta_star)
+  [estimates_list, error_list] = test_params(args.num_applicants, x, y, z, theta, args.applicants_per_round, theta_star, pref_vect)
   return estimates_list[np.newaxis], error_list[np.newaxis]
   
 
