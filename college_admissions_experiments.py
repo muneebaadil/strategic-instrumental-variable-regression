@@ -253,7 +253,7 @@ def ols(x,y):
   theta_hat_ols_ = model.coef_
   return theta_hat_ols_
   
-def tsls(x,y,theta): # runs until round T
+def tsls(x,y,theta, w): # runs until round T
   # my implementation
   # regress x onto theta: estimate omega
   model = LinearRegression()
@@ -261,8 +261,9 @@ def tsls(x,y,theta): # runs until round T
   omega_hat_ = model.coef_.T
 
   # regress y onto theta: estimate lambda
+  theta_admit = theta[w==1]
   model = LinearRegression()
-  model.fit(theta, y)
+  model.fit(theta_admit, y)
   lambda_hat_ = model.coef_ 
 
   # estimate theta^* 
@@ -270,7 +271,6 @@ def tsls(x,y,theta): # runs until round T
     np.linalg.inv(omega_hat_), lambda_hat_
   )
   return theta_hat_tsls_
-  
 def our2(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
@@ -353,12 +353,11 @@ def test_params(num_applicants, x, y, z, theta, applicants_per_round, theta_star
     # filtering out rejected students
     x_round_admitted = x_round[z_round==1]
     y_round_admitted = y_round[z_round==1]
-    theta_round_admitted = theta_round[z_round==1] 
 
     # estimates
     ols_estimate = ols(x_round_admitted, y_round_admitted) # ols w/ intercept estimate
     try:
-      tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
+      tsls_estimate = tsls(x_round, y_round_admitted, theta_round, z_round) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
       tsls_estimate = np.array([np.nan, np.nan])
     our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
@@ -532,26 +531,16 @@ def plot_outcome(y, adv_idx, disadv_idx, prefix):
 
 def run_experiment(args, i):
   np.random.seed(i)
-  if args.generate == 1:
-    b,x,y,EW, theta, z, y_hat, adv_idx, disadv_idx, o, theta_star = generate_data(
-      num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-      fixed_effort_conversion=args.fixed_effort_conversion
-      )
-  # elif args.generate == 2:
-  #   b,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx = generate_data2(
-  #     n_seen_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-  #     fixed_effort_conversion=args.fixed_effort_conversion
-  #   )
-  # plot data.
+  b,x,y,EW, theta, z, y_hat, adv_idx, disadv_idx, o, theta_star = generate_data(
+    num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
+    fixed_effort_conversion=args.fixed_effort_conversion
+    )
   plot_data(y, z, f'outcome_select_d{i}')
   plot_data(y_hat, z, f'outcome_pred_select_d{i}')
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
   plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}')
 
-  if args.generate == 1:
-    [estimates_list, error_list] = test_params(args.num_applicants, x, y, z, theta, args.applicants_per_round, theta_star)
-  # else:
-  #   [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
+  [estimates_list, error_list] = test_params(args.num_applicants, x, y, z, theta, args.applicants_per_round, theta_star)
   return estimates_list[np.newaxis], error_list[np.newaxis]
   
 
