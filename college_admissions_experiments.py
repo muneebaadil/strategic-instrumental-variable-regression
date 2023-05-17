@@ -353,9 +353,6 @@ def test_params_env(num_applicants, x, y, z, theta, applicants_per_round, theta_
   assert z.shape == (args.num_applicants, ) 
   assert theta_star.shape == (2,)
 
-  assert args.num_envs == 1
-  theta_star, theta, y = theta_star.squeeze(), theta.squeeze(), y.squeeze()
-  
   # save estimates and errors for every even round 
   if args.stream:
     upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
@@ -368,7 +365,7 @@ def test_params_env(num_applicants, x, y, z, theta, applicants_per_round, theta_
   for t in tqdm(upp_limits, leave=False):
     x_round = x[:t]
     y_round = y[:t]
-    theta_round = theta[:t]
+    theta_round = theta[env_idx, :t]
     z_round = z[:t]
 
     # filtering out rejected students
