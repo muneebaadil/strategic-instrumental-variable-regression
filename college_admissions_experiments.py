@@ -102,7 +102,10 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   g = np.ones(n_samples)*0.5 # legacy students shifted up
   g[disadv_idx]=-0.5 # first-gen students shifted down
   g += np.random.normal(1,0.2,size=n_samples) # non-zero-mean
-
+  # args.o_bias =1 
+  # g = np.zeros(shape=(n_samples,))
+  # g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=half)
+  # g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=half)
   return b, g, adv_idx, disadv_idx
 
 def compute_xt(EWi, b, theta):
@@ -145,7 +148,7 @@ def generate_theta(args):
       theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
   
       # scaled duplicate of each theta. 
-      scale = np.random.uniform(low=1, high=10, size=(int(n_rounds/2),))
+      scale = np.random.uniform(low=0, high=2, size=(int(n_rounds/2),))
       scale = np.diag(v=scale)
       theta_scaled = scale.dot(theta)
   
@@ -249,6 +252,7 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
 
   # recover scaled duplicate 
   theta_admit = theta[w==1]
+  x_admit = x[w==1]
   theta_admit_, counts = np.unique(theta_admit, axis=0, return_counts=True)
   # to use thetas having the most number of applicants
   idx = np.argsort(counts); idx = idx[::-1]
@@ -272,13 +276,14 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
       pair = theta_admit_[[i,j]]
 
       if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
-        A.append(
-          (pair[1] - pair[0]).dot(omega_hat_)[np.newaxis]
-        )
         idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
         idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
         est1 = y[idx_grp1].mean()
-        est0 = y[idx_grp0].mean()
+        est0 = y[idx_grp0].mean() 
+        
+        A.append(
+          (x_admit[idx_grp1].mean(axis=0) - x_admit[idx_grp0].mean(axis=0))[np.newaxis]
+        )
         b.append(np.array([est1-est0]))
         
         curr_n_eqs += 1
@@ -318,7 +323,7 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
 def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
   # save estimates and errors for every even round 
   if args.stream:
-    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, 2)]
+    upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
   else:
     upp_limits = [num_applicants]
   estimates_list = np.zeros([len(upp_limits),3,2])
