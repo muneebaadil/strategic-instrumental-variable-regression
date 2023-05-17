@@ -33,6 +33,10 @@ parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'seq
 parser.add_argument('--clip', action='store_true')
 parser.add_argument('--b-bias', type=float, default=1.25)
 
+# multienv
+parser.add_argument('--num-envs', default=1, type=int)
+parser.add_argument('--pref',default='uniform',choices=['uniform'], type=str)
+
 # algorithm
 parser.add_argument('--sample-weights', action='store_true')
 
@@ -46,7 +50,6 @@ parser.add_argument('--generate', default=1, choices=[1,2], type=int)
 parser.add_argument('--stream', action='store_true')
 args = parser.parse_args()
 
-theta_star = np.array([0,0.5])
 
 eqs_data = {}
 for i in (1, 0):
@@ -101,21 +104,24 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
 
   # confounding error term g (error on true college GPA)
   args.o_bias =1 
-  g = np.zeros(shape=(n_samples,))
-  g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=half)
-  g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=half)
+  g = np.zeros(shape=(n_samples,args.num_envs))
+  g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=(half,args.num_envs) )
+  g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
   return b, g, adv_idx, disadv_idx
 
-def compute_xt(EWi, b, theta):
+def compute_xt(EWi, b, theta, pref_vect):
   assert EWi.shape[0] == b.shape[0]
-  assert b.shape[0] == theta.shape[0]
+  assert b.shape[0] == theta.shape[1]
 
   n_applicants = b.shape[0]
 
   x = np.zeros([n_applicants,b.shape[1]])
   # TODO: vectorize this?
   for i in range(n_applicants):
-    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),theta[i]) # optimal solution
+    thetas_applicant = theta[:, i, :]
+    assert thetas_applicant.shape == (args.num_envs, 2)
+    thetai = thetas_applicant.T.dot(pref_vect)
+    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),thetai) # optimal solution
 
   if args.clip:
     x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
@@ -131,6 +137,11 @@ def get_selection(y_hat):
     prob = np.mean(y_hat_peers <= _y_hat)
     w[i] = np.random.binomial(n=1, p=prob)
   return w
+
+def generate_thetas(args):
+  thetas = [generate_theta(args) for _ in range(args.num_envs)]
+  thetas = np.stack(thetas)
+  return thetas
 
 def generate_theta(args):
   if args.admit_all: # harris et. al settings. 
@@ -165,18 +176,19 @@ def generate_theta(args):
     return theta
 
 def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
-  half = int(num_applicants/2) 
-  m = theta_star.size
+  theta_star = np.ones((args.num_envs,1)).dot(np.array([[0, 0.5]]))
 
   mean_sat = 900
   mean_gpa = 2
   sigma_sat = 200
   sigma_gpa = 0.5
 
+  if args.pref == 'uniform':
+      pref_vect = np.ones(shape=(args.num_envs,))
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
 
   # assessment rule 
-  theta = generate_theta(args)
+  theta = generate_thetas(args)
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
 
@@ -185,37 +197,44 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
 
   # observable features x
-  x = compute_xt(EWi, b, theta)
+  x = compute_xt(EWi, b, theta, pref_vect)
 
   # true outcomes (college gpa)
   # y = np.clip() # clipped outcomes
-  y = np.matmul(x,theta_star) + g
+  assert x[np.newaxis].shape == (1, args.num_applicants, 2)
+  assert theta.shape == (args.num_envs, args.num_applicants, 2)
+  assert g.shape == (args.num_applicants, args.num_envs)
+  assert theta_star.shape == (args.num_envs, 2)  
+
+  y = (x[np.newaxis] * theta_star[:, np.newaxis]).sum(axis=-1) + g.T
+  # y = np.matmul(x,theta_star) + g
   if args.clip:
     y = np.clip(y, 0, 4)
   
   # our setup addition 
   # computing admission results.
-  assert x.shape == theta.shape
   x_ = x.copy()
   x_[:,0] = (x_[:,0] - 400) / 300
   y_hat = (x_ * theta).sum(axis=-1)
-  if not admit_all:
-    w = np.zeros_like(y_hat)
-    # comparing people coming in the same rounds. 
-    for r in range(n_rounds):
-      y_hat_r = y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
-  
-      w_r = get_selection(y_hat_r)
-      w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
-      # for j, _y_hat_r in enumerate(y_hat_r):
-      #   y_hat_r_peers = y_hat_r[np.arange(applicants_per_round) != j]
-      #   prob = np.mean(y_hat_r_peers  <= _y_hat_r)
-      #   w[i] = np.random.binomial(n=1, p=prob)
-      #   i += 1
-  else:
-    w = np.ones_like(y_hat)
 
-  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx, g
+
+  def _get_selection(_y_hat, admit_all, n_rounds):
+    if not admit_all:
+      _w = np.zeros_like(_y_hat)
+      # comparing people coming in the same rounds. 
+      for r in range(n_rounds):
+        _y_hat_r = _y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
+  
+        w_r = get_selection(_y_hat_r)
+        _w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
+    else:
+      _w = np.ones_like(y_hat)
+    return _w
+  w = np.zeros((args.num_envs, num_applicants))
+  for env_idx in range(args.num_envs):
+    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds)
+
+  return b,x,y,EW,theta, w, y_hat, adv_idx, disadv_idx, g.T, theta_star
 
 # %%
 def ols(x,y):
@@ -318,7 +337,7 @@ def our2(x, y, theta, w, b, o, effort_conversion_matrix):
   theta_star_est = m.coef_ 
   return theta_star_est
 #%%
-def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
+def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW, theta_star):
   # save estimates and errors for every even round 
   if args.stream:
     upp_limits = [x for x in range(applicants_per_round*2, num_applicants+1, applicants_per_round)]
@@ -360,14 +379,24 @@ def test_params(num_applicants, x, y, w, theta, applicants_per_round, b, o, EW):
 
 
 
-def plot_data(data, condition, name='dataset.pdf'):
-  fig,ax=plt.subplots()
-  ax.hist(data, bins='auto', color='green', label='all',  histtype='step')
-  ax.hist(data[condition==0], bins='auto', color='red', label='rejected',  histtype='step')
-  ax.hist(data[condition==1], bins='auto', color='blue', label='accepted',  histtype='step')
-  ax.legend()
-  plt.savefig(os.path.join(dirname, name))
-  plt.close()
+def plot_data(data, condition, prefix):
+  """
+  data \in (n_envs, n_applicants)
+  condition \in (n_envs, n_applicants)
+  """
+  assert data.shape == (args.num_envs, args.num_applicants)
+  
+  n_envs, _ = data.shape
+  for env_idx in range(n_envs):
+    _,ax = plt.subplots()
+    data_ , condition_ = data[env_idx], condition[env_idx]
+    ax.hist(data_, bins='auto', color='green', label='all',  histtype='step')
+    ax.hist(data_[condition_==0], bins='auto', color='red', label='rejected',  histtype='step')
+    ax.hist(data_[condition_==1], bins='auto', color='blue', label='accepted',  histtype='step')
+    ax.legend()
+    savename = os.path.join(dirname, f'{prefix}_env{env_idx}.png')
+    plt.savefig(savename)
+    plt.close()
 
 def plot_features(x, z, adv_idx, disadv_idx, fname, fname2):
   ## plot first-gen & legacy shift unobservable features (z) to observable (x) 
@@ -472,38 +501,42 @@ def plot_error_estimate(error_list_mean):
   plt.close()
   # plt.show()
 
-def plot_outcome(y, adv_idx, disadv_idx, fname):
-  fig,ax=plt.subplots()
-  plt.hist(y,bins='auto',label='combined')
-  plt.axvline(x=np.mean(y),color='blue',linestyle='--', linewidth = 2, label='combined mean')
+def plot_outcome(y, adv_idx, disadv_idx, prefix):
+  """
+  y \in (n_envs, n_applicants)
+  """
+  assert y.shape == (args.num_envs, args.num_applicants)
+  num_envs, num_applicants = y.shape
+  for env_idx in range(num_envs):
+    y_ = y[env_idx]
+    fig,ax=plt.subplots()
+    plt.hist(y_,bins='auto',label='combined')
+    plt.axvline(x=np.mean(y_),color='blue',linestyle='--', linewidth = 2, label='combined mean')
 
-  # disadvantaged
-  plt.hist(y[disadv_idx],bins='auto',label='disadvantaged', alpha=.85)
-  plt.axvline(x=np.mean(y[disadv_idx]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
+    # disadvantaged
+    plt.hist(y_[disadv_idx],bins='auto',label='disadvantaged', alpha=.85)
+    plt.axvline(x=np.mean(y_[disadv_idx]),color='orange',linestyle='--', linewidth = 2, label='disadvantaged mean')
 
-  # advantaged
-  plt.hist(y[adv_idx],bins='auto',label='advantaged', alpha=0.7)
-  plt.axvline(x=np.mean(y[adv_idx]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
+    # advantaged
+    plt.hist(y_[adv_idx],bins='auto',label='advantaged', alpha=0.7)
+    plt.axvline(x=np.mean(y_[adv_idx]), linestyle='--', color = 'green', linewidth = 2, label='advantaged mean')
 
-  # plt.xlim(0,4)
-  plt.xticks(fontsize=14)
-  plt.yticks(fontsize=14)
-  plt.xlabel('College GPA (4.0 scale)', fontsize=14)
-  plt.ylabel('Number of applicants', fontsize=14)
+    # plt.xlim(0,4)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.xlabel('College GPA (4.0 scale)', fontsize=14)
+    plt.ylabel('Number of applicants', fontsize=14)
 
-  #plt.title("True college GPA (y) for disadvantaged vs. advantaged students")
+    plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
 
-  plt.legend(bbox_to_anchor=(0, 1.3), loc='upper left', fontsize=12, ncol=2)
-
-  fname = os.path.join(dirname, f'{fname}')
-  plt.savefig(fname, dpi=500, bbox_inches='tight')
-  plt.close()
-  # plt.show()
+    savename = os.path.join(dirname, f'{prefix}_env{env_idx}.png')
+    plt.savefig(savename, dpi=500, bbox_inches='tight')
+    plt.close()
 
 def run_experiment(args, i):
   np.random.seed(i)
   if args.generate == 1:
-    b,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx, o = generate_data(
+    b,x,y,EW, theta, w, y_hat, adv_idx, disadv_idx, o, theta_star = generate_data(
       num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
       fixed_effort_conversion=args.fixed_effort_conversion
       )
@@ -513,13 +546,13 @@ def run_experiment(args, i):
   #     fixed_effort_conversion=args.fixed_effort_conversion
   #   )
   # plot data.
-  plot_data(y, w, f'outcome_select_d{i}.png')
-  plot_data(y_hat, w, f'outcome_pred_select_d{i}.png')
+  plot_data(y, w, f'outcome_select_d{i}')
+  plot_data(y_hat, w, f'outcome_pred_select_d{i}')
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
-  plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}.png')
+  plot_outcome(y, adv_idx, disadv_idx, f'outcome_d{i}')
 
   if args.generate == 1:
-    [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o, EW)
+    [estimates_list, error_list] = test_params(args.num_applicants, x, y, w, theta, args.applicants_per_round, b, o, EW, theta_star)
   # else:
   #   [estimates_list, error_list] = test_params2(args.num_applicants, x, y, w, theta, args.applicants_per_round)
   return estimates_list[np.newaxis], error_list[np.newaxis]
