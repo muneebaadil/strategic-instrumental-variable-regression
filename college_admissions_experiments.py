@@ -382,8 +382,8 @@ def test_params_env(num_applicants, x, y, z, theta, applicants_per_round, theta_
       tsls_estimate = tsls(x_round_admitted, y_round_admitted, theta_round_admitted) # 2sls w/ intercept estimate
     except np.linalg.LinAlgError:
       tsls_estimate = np.array([np.nan, np.nan])
-    # our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
-    our_estimate = np.array([np.nan, np.nan])
+    our_estimate = our2(x_round, y_round_admitted, theta_round, z_round)
+    # our_estimate = np.array([np.nan, np.nan])
     estimates_list[i,:] += [ols_estimate,tsls_estimate, our_estimate]
 
     # errors
