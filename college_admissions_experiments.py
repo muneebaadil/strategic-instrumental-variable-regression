@@ -37,6 +37,7 @@ parser.add_argument('--b-bias', type=float, default=1.25)
 parser.add_argument('--num-envs', default=1, type=int)
 parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
 parser.add_argument('--prob', default=0.5, type=float)
+parser.add_argument('--no-protocol', action='store_true')
 
 # algorithm
 parser.add_argument('--sample-weights', action='store_true')
@@ -49,6 +50,7 @@ parser.add_argument('--experiment-name', type=str)
 # temporary
 parser.add_argument('--generate', default=1, choices=[1,2], type=int)
 parser.add_argument('--stream', action='store_true')
+parser.add_argument('--hack', action='store_true')
 args = parser.parse_args()
 
 
@@ -140,11 +142,24 @@ def get_selection(y_hat):
   return w
 
 def generate_thetas(args):
-  thetas = [generate_theta(args) for _ in range(args.num_envs)]
+  thetas = [generate_theta(i, args) for i in range(args.num_envs)]
   thetas = np.stack(thetas)
   return thetas
 
-def generate_theta(args):
+
+def to_duplicate(sd, np, i):
+  if sd is None:
+    return False
+  else:
+    if np==False:
+      return True
+    else:
+      if i==0:
+        return True
+      else:
+        return False
+
+def generate_theta(i, args):
   if args.admit_all: # harris et. al settings. 
     theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],args.num_applicants)
     return theta 
@@ -152,8 +167,10 @@ def generate_theta(args):
     assert args.num_applicants % args.applicants_per_round == 0
     n_rounds = int(args.num_applicants / args.applicants_per_round)
 
-    if args.scaled_duplicates is None: # random vectors for every round
+    td = to_duplicate(args.scaled_duplicates, args.no_protocol, i)
+    if not td: # random vectors for every round
       theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+
     else: # making sure there exists a scaled duplicate of each theta per round
       theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
   
@@ -197,6 +214,17 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   theta = generate_thetas(args)
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
+  
+  if args.hack:
+    for _i, i in enumerate(range(0, args.num_applicants, args.applicants_per_round)):
+      if _i % 2 == 0:
+        index1 = 0
+        index2 = 1
+      elif _i % 2 == 1:
+        index1 = 1
+        index2 = 0
+      theta[1, i:i+args.applicants_per_round, index1] = np.ones((args.applicants_per_round,))
+      theta[1, i:i+args.applicants_per_round, index2] = np.ones((args.applicants_per_round,)) * 100000
 
   # effort conversion matrices
   EW = np.array([[10.0,0],[0,1.0]])
@@ -561,6 +589,13 @@ def run_experiment(args, i):
     num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
     fixed_effort_conversion=args.fixed_effort_conversion
     )
+    
+  if args.hack:
+    o2 = o[1]
+    for i in range(0, args.num_applicants, args.applicants_per_round):
+      o2_round = o2[i:i+args.applicants_per_round]
+      z_round = z [i:i+args.applicants_per_round]
+      print(o2_round[z_round==1].mean()) 
   plot_data(y, z, f'outcome_select_d{i}')
   plot_data(y_hat, z, f'outcome_pred_select_d{i}')
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
