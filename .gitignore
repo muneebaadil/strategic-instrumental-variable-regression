@@ -3,3 +3,4 @@
 college_admission_*
 experiments*/
 figures/
+*.pyc
