@@ -5,11 +5,8 @@ import os
 import subprocess
 from time import time 
 from tqdm import tqdm
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt 
-from matplotlib.patches import Patch
-from matplotlib.lines import Line2D
 from sklearn.linear_model import LinearRegression
 from types import SimpleNamespace
 # for notebook. 
@@ -19,39 +16,45 @@ def get_git_revision_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 # %%
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--n-cores', default=1, type=int)
+def get_args(cmd):
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--n-cores', default=1, type=int)
 
-# dataset
-parser.add_argument('--num-repeat', default=10, type=int)
-parser.add_argument('--num-applicants', default=10000, type=int)
-parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
-parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
-parser.add_argument('--fixed-effort-conversion', action='store_true')
-parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
-parser.add_argument('--clip', action='store_true')
-parser.add_argument('--b-bias', type=float, default=1.25)
+  # dataset
+  parser.add_argument('--num-repeat', default=10, type=int)
+  parser.add_argument('--num-applicants', default=10000, type=int)
+  parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
+  parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
+  parser.add_argument('--fixed-effort-conversion', action='store_true')
+  parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
+  parser.add_argument('--clip', action='store_true')
+  parser.add_argument('--b-bias', type=float, default=1.25)
 
-# multienv
-parser.add_argument('--num-envs', default=1, type=int)
-parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
-parser.add_argument('--prob', default=0.5, type=float)
-parser.add_argument('--no-protocol', action='store_true')
+  # multienv
+  parser.add_argument('--num-envs', default=1, type=int)
+  parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
+  parser.add_argument('--prob', default=0.5, type=float)
+  parser.add_argument('--no-protocol', action='store_true')
 
-# algorithm
-parser.add_argument('--sample-weights', action='store_true')
+  # algorithm
+  parser.add_argument('--sample-weights', action='store_true')
 
-# experiment
-parser.add_argument('--test-run', action='store_true')
-parser.add_argument('--experiment-root', type=str, default='experiments')
-parser.add_argument('--experiment-name', type=str)
+  # experiment
+  parser.add_argument('--test-run', action='store_true')
+  parser.add_argument('--experiment-root', type=str, default='experiments')
+  parser.add_argument('--experiment-name', type=str)
 
-# temporary
-parser.add_argument('--generate', default=1, choices=[1,2], type=int)
-parser.add_argument('--stream', action='store_true')
-parser.add_argument('--hack', action='store_true')
-args = parser.parse_args()
+  # temporary
+  parser.add_argument('--generate', default=1, choices=[1,2], type=int)
+  parser.add_argument('--stream', action='store_true')
+  parser.add_argument('--hack', action='store_true')
+  
+  if cmd is None:
+    args = parser.parse_args()
+  else:
+    args = parser.parse_args(cmd.split(' '))
+  return args
 
 
 eqs_data = {}
@@ -606,79 +609,81 @@ def run_experiment(args, i):
   
 
 # %% 
-import pickle as pkl
-import time
-experiment_name = time.strftime('%Y%m%d-%H%H%S') if args.experiment_name is None else args.experiment_name
+if __name__=='__main__':
+  import pickle as pkl
+  import time
+  args = get_args(None)
+  experiment_name = time.strftime('%Y%m%d-%H%H%S') if args.experiment_name is None else args.experiment_name
 
-if not args.test_run:
-  dirname = os.path.join(args.experiment_root, f'{experiment_name}')
-  if os.path.exists(dirname):
-    dirname = f"{dirname}_"
-else:
-  dirname = os.path.join(args.experiment_root, f'test-run')
-  if os.path.exists(dirname):
-    import shutil
-    shutil.rmtree(dirname)
+  if not args.test_run:
+    dirname = os.path.join(args.experiment_root, f'{experiment_name}')
+    if os.path.exists(dirname):
+      dirname = f"{dirname}_"
+  else:
+    dirname = os.path.join(args.experiment_root, f'test-run')
+    if os.path.exists(dirname):
+      import shutil
+      shutil.rmtree(dirname)
   
-os.makedirs(dirname)
-git_hash = get_git_revision_hash()
-with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
-  f.write(git_hash)
-  f.write('\n')
-  f.write(' '.join(sys.argv))
+  os.makedirs(dirname)
+  git_hash = get_git_revision_hash()
+  with open(os.path.join(dirname, 'git_hash.txt'), 'w+') as f:
+    f.write(git_hash)
+    f.write('\n')
+    f.write(' '.join(sys.argv))
   
-epochs = args.num_repeat
-half = args.num_applicants
+  epochs = args.num_repeat
+  half = args.num_applicants
 
-estimates_list_mean = np.zeros((epochs,half,2,2))
-error_list_mean = np.zeros((epochs,half,2))
-estimates_list_mean = []
-error_list_mean = []
+  estimates_list_mean = np.zeros((epochs,half,2,2))
+  error_list_mean = np.zeros((epochs,half,2))
+  estimates_list_mean = []
+  error_list_mean = []
 
-estimates_list_mean, error_list_mean = [], [] 
+  estimates_list_mean, error_list_mean = [], [] 
 
-if args.n_cores == 1:  # sequential
-  for i in tqdm(range(epochs)):
-    # run experiment
-    estimates_list, error_list = run_experiment(args, i)
+  if args.n_cores == 1:  # sequential
+    for i in tqdm(range(epochs)):
+      # run experiment
+      estimates_list, error_list = run_experiment(args, i)
 
-    estimates_list_mean.append(estimates_list)
-    error_list_mean.append(error_list)
-elif args.n_cores > 1:
-  import multiprocessing as mp  
-  args_list = [(args, i) for i in range(epochs)]
-  with mp.Pool(processes=args.n_cores) as p:
-    out = p.starmap(
-      run_experiment, args_list
-    )
+      estimates_list_mean.append(estimates_list)
+      error_list_mean.append(error_list)
+  elif args.n_cores > 1:
+    import multiprocessing as mp  
+    args_list = [(args, i) for i in range(epochs)]
+    with mp.Pool(processes=args.n_cores) as p:
+      out = p.starmap(
+        run_experiment, args_list
+      )
 
-  for _out in out:
-    if not (_out is None): # if no LA error.
-      estimates_list_mean.append(_out[0])
-      error_list_mean.append(_out[1])
+    for _out in out:
+      if not (_out is None): # if no LA error.
+        estimates_list_mean.append(_out[0])
+        error_list_mean.append(_out[1])
 
-  # estimates_list_mean = [_out[0] for _out in out]
-  # error_list_mean = [_out[1] for _out in out]
-else:
-  print('n cores invalid.')
+    # estimates_list_mean = [_out[0] for _out in out]
+    # error_list_mean = [_out[1] for _out in out]
+  else:
+    print('n cores invalid.')
   
-estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
-error_list_mean = np.concatenate(error_list_mean,axis=0)
+  estimates_list_mean = np.concatenate(estimates_list_mean,axis=0)
+  error_list_mean = np.concatenate(error_list_mean,axis=0)
 
 
-filename = os.path.join(dirname, "data")
-# filename = 'college_admission_'+timestr
-with open(filename, 'wb') as f:
-    save = {
-      'estimates_list_mean': estimates_list_mean, 
-      'error_list_mean': error_list_mean,
-      # 'y': y, 'x': x, 'z': z,  'EW':EW, 'theta':theta, 'theta_star': theta_star, 'w': w, 'y_hat':y_hat
-    }
-    pkl.dump(save, f)
+  filename = os.path.join(dirname, "data")
+  # filename = 'college_admission_'+timestr
+  with open(filename, 'wb') as f:
+      save = {
+        'estimates_list_mean': estimates_list_mean, 
+        'error_list_mean': error_list_mean,
+        # 'y': y, 'x': x, 'z': z,  'EW':EW, 'theta':theta, 'theta_star': theta_star, 'w': w, 'y_hat':y_hat
+      }
+      pkl.dump(save, f)
 
-# plot_error_estimate(error_list_mean)
+  # plot_error_estimate(error_list_mean)
 
-# save group data.
-filename = os.path.join(dirname, "eqs_data.json")
-with open(filename, "w") as f:
-  json.dump(eqs_data, f)
+  # save group data.
+  filename = os.path.join(dirname, "eqs_data.json")
+  with open(filename, "w") as f:
+    json.dump(eqs_data, f)
