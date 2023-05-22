@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from types import SimpleNamespace
 # for notebook. 
-args = SimpleNamespace(num_applicants=5000, num_repeat=1, test_run=True, admit_all=False)
 
 def get_git_revision_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
@@ -79,7 +78,7 @@ def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
         EWi[i] -= noise
   return EWi
 
-def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
+def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa, args):
   assert n_samples % 2 == 0, f"{n_samples} not divisible by 2"
   half = int(n_samples / 2)
   b = np.zeros([n_samples,2])
@@ -115,7 +114,7 @@ def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa):
   g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
   return b, g, adv_idx, disadv_idx
 
-def compute_xt(EWi, b, theta, pref_vect):
+def compute_xt(EWi, b, theta, pref_vect, args):
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[1]
 
@@ -196,7 +195,7 @@ def generate_theta(i, args):
     assert theta.shape[0] == args.num_applicants
     return theta
 
-def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion):
+def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args):
   theta_star = np.zeros(shape=(args.num_envs, 2))
   theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
 
@@ -211,7 +210,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   elif args.pref == 'geometric':
     pref_vect = ((1 - args.prob) ** np.arange(args.num_envs)) * args.prob
     pref_vect = pref_vect / np.sum(pref_vect)
-  b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa)
+  b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa, args)
 
   # assessment rule 
   theta = generate_thetas(args)
@@ -234,7 +233,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
 
   # observable features x
-  x = compute_xt(EWi, b, theta, pref_vect)
+  x = compute_xt(EWi, b, theta, pref_vect, args)
 
   # true outcomes (college gpa)
   # y = np.clip() # clipped outcomes
@@ -267,6 +266,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
     else:
       _w = np.ones_like(y_hat)
     return _w
+
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
     w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds)
@@ -281,7 +281,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
       temp = np.random.multinomial(n=1, pvals=pvals, size=1)
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx+1 # offset to avoid conflict with "no uni" decision
-  return b,x,y,EW,theta, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, pref_vect
+  return b,x,y,EW,theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, pref_vect
 
 # %%
 def ols(x,y):
@@ -372,7 +372,6 @@ def test_params(num_applicants, x, y, z, theta, applicants_per_round, theta_star
   estimates_list_env, error_list_env = [], [] 
 
   for env_idx in range(args.num_envs):
-    # TODO: make it multiprocessing?
     z_env = z==(env_idx+1)
     theta_star_env= theta_star[env_idx]
 
@@ -588,9 +587,9 @@ def plot_outcome(y, adv_idx, disadv_idx, prefix):
 
 def run_experiment(args, i):
   np.random.seed(i)
-  b,x,y,EW, theta, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect = generate_data(
+  b,x,y,EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect = generate_data(
     num_applicants=args.num_applicants, admit_all=args.admit_all, applicants_per_round=args.applicants_per_round,
-    fixed_effort_conversion=args.fixed_effort_conversion
+    fixed_effort_conversion=args.fixed_effort_conversion, args=args
     )
     
   if args.hack:
