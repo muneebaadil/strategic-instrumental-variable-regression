@@ -29,6 +29,7 @@ def get_args(cmd):
   parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
   parser.add_argument('--clip', action='store_true')
   parser.add_argument('--b-bias', type=float, default=1.25)
+  parser.add_argument('--save-dataset', action='store_true')
 
   # multienv
   parser.add_argument('--num-envs', default=1, type=int)
@@ -78,7 +79,7 @@ def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
         EWi[i] -= noise
   return EWi
 
-def generate_bt(n_samples, mean_sat, mean_gpa, sigma_sat, sigma_gpa, args):
+def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
   assert n_samples % 2 == 0, f"{n_samples} not divisible by 2"
   half = int(n_samples / 2)
   b = np.zeros([n_samples,2])
@@ -195,12 +196,13 @@ def generate_theta(i, args):
     assert theta.shape[0] == args.num_applicants
     return theta
 
-def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args):
+def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args, _theta_star=None):
   theta_star = np.zeros(shape=(args.num_envs, 2))
-  theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
+  if _theta_star is None:
+    theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
+  else:
+    theta_star[:, 1] = np.random.normal(loc=_theta_star, scale=0.2, size=(args.num_envs, ))
 
-  mean_sat = 900
-  mean_gpa = 2
   sigma_sat = 200
   sigma_gpa = 0.5
 
@@ -210,7 +212,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   elif args.pref == 'geometric':
     pref_vect = ((1 - args.prob) ** np.arange(args.num_envs)) * args.prob
     pref_vect = pref_vect / np.sum(pref_vect)
-  b, g, adv_idx, disadv_idx = generate_bt(num_applicants, mean_sat, mean_gpa, sigma_sat, sigma_gpa, args)
+  b, g, adv_idx, disadv_idx = generate_bt(num_applicants, sigma_sat, sigma_gpa, args)
 
   # assessment rule 
   theta = generate_thetas(args)
@@ -592,6 +594,12 @@ def run_experiment(args, i):
     fixed_effort_conversion=args.fixed_effort_conversion, args=args
     )
     
+  if args.save_dataset:
+    tosave = {
+      'b':b,'x':x,'y':y,'EW':EW,'theta': theta,'w': w,'z': z,'y_hat': y_hat,'adv_idx': adv_idx,'disadv_idx': disadv_idx,'o': o,'theta_star': theta_star, 'pref_vect': pref_vect 
+    }
+    with open(os.path.join(dirname, 'inputdata'), 'wb') as f:
+      pkl.dump(tosave, f)
   if args.hack:
     o2 = o[1]
     for i in range(0, args.num_applicants, args.applicants_per_round):
