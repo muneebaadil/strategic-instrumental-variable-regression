@@ -13,7 +13,6 @@ from types import SimpleNamespace
 
 def get_git_revision_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
-
 # %%
 def get_args(cmd):
   import argparse
@@ -122,7 +121,6 @@ def compute_xt(EWi, b, theta, pref_vect, args):
   n_applicants = b.shape[0]
 
   x = np.zeros([n_applicants,b.shape[1]])
-  # TODO: vectorize this?
   for i in range(n_applicants):
     thetas_applicant = theta[:, i, :]
     assert thetas_applicant.shape == (args.num_envs, 2)
@@ -219,17 +217,6 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
   
-  if args.hack:
-    for _i, i in enumerate(range(0, args.num_applicants, args.applicants_per_round)):
-      if _i % 2 == 0:
-        index1 = 0
-        index2 = 1
-      elif _i % 2 == 1:
-        index1 = 1
-        index2 = 0
-      theta[1, i:i+args.applicants_per_round, index1] = np.ones((args.applicants_per_round,))
-      theta[1, i:i+args.applicants_per_round, index2] = np.ones((args.applicants_per_round,)) * 100000
-
   # effort conversion matrices
   EW = np.array([[10.0,0],[0,1.0]])
   EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
@@ -600,12 +587,6 @@ def run_experiment(args, i):
     }
     with open(os.path.join(dirname, 'inputdata'), 'wb') as f:
       pkl.dump(tosave, f)
-  if args.hack:
-    o2 = o[1]
-    for i in range(0, args.num_applicants, args.applicants_per_round):
-      o2_round = o2[i:i+args.applicants_per_round]
-      z_round = z [i:i+args.applicants_per_round]
-      print(o2_round[z_round==1].mean()) 
   plot_data(y, z, f'outcome_select_d{i}')
   plot_data(y_hat, z, f'outcome_pred_select_d{i}')
   plot_features(x, b, adv_idx, disadv_idx, f'features_d{i}_x1.png', f'features_d{i}_x2.png')
