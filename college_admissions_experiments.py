@@ -37,7 +37,7 @@ def get_args(cmd):
   parser.add_argument('--no-protocol', action='store_true')
 
   # algorithm
-  parser.add_argument('--sample-weights', action='store_true')
+  parser.add_argument('--methods', choices=('ols', '2sls', 'ours'), nargs='+', default='ours')
 
   # experiment
   parser.add_argument('--test-run', action='store_true')
