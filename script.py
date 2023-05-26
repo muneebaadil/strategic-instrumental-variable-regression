@@ -1,14 +1,10 @@
+
 # %%
-import sys
-import json
-import os
 import subprocess
-from time import time 
 from tqdm import tqdm
 import numpy as np
-import matplotlib.pyplot as plt 
 from sklearn.linear_model import LinearRegression
-from types import SimpleNamespace
+import pandas as pd
 # for notebook. 
 
 def get_git_revision_hash() -> str:
@@ -350,3 +346,68 @@ def our2(x, y, theta, w):
   theta_star_est = m.coef_ 
   return theta_star_est
 #%%
+def run_multi_exp(seed, args, env_idx=None):
+    np.random.seed(seed)
+    b, x, y, EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect  = generate_data(
+    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args
+    )
+
+    err_list = {}
+    envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
+    for env_idx in envs_itr:
+        dictenv = run_single_env(args, x, y, theta, z, theta_star, env_idx)
+        for k, v in dictenv.items():
+            err_list[f'{k}_env{env_idx}'] = v
+    
+    return err_list
+
+def run_single_env(args, x, y, theta, z, theta_star, env_idx):
+    y_env = y[env_idx].flatten() 
+    theta_env = theta[env_idx]
+    z_env = z==env_idx+1
+        
+    upp_limits = [x for x in range(args.applicants_per_round*2, args.num_applicants+1, args.applicants_per_round)]
+        
+    err_list = {m: [None] * len(upp_limits) for m in args.methods}
+    for i, t in tqdm(enumerate(upp_limits)):
+        x_round = x[:t]
+        y_env_round = y_env[:t]
+        z_env_round = z_env[:t]
+        theta_env_round = theta_env[:t]
+
+        # filtering out rejected students
+        y_env_round_selected = y_env_round[z_env_round]
+        x_round_selected = x_round[z_env_round]
+        theta_env_round_selected = theta_env_round[z_env_round]
+
+        for m in args.methods:
+            if m == 'ours':
+                est = our2(x_round, y_env_round_selected, theta_env_round, z_env_round)
+            elif m == '2sls':
+                try:
+                    est = tsls(x_round_selected, y_env_round_selected, theta_env_round_selected)
+                except np.linalg.LinAlgError:
+                    est = np.array([np.nan, np.nan])
+            elif m == 'ols':
+                est = ols(x_round_selected, y_env_round_selected)
+            
+            assert theta_star[env_idx].shape == est.shape, f"{theta[0].shape}, {est.shape}"
+            err_list[m][i] = np.linalg.norm(theta_star[env_idx] - est )
+    return err_list
+
+# convert to dataframe.
+def runs2df(runs):
+    """
+    Args:
+    runs: List of dictionaries
+
+    Returns:
+    Converts to list of dataframes and concatenate those together.
+    """
+    dfs = []
+    for r in runs:
+        df = pd.DataFrame(r)
+        dfs.append(df)
+    df = pd.concat(dfs)
+    df.reset_index(inplace=True); df.rename({'index': 'iterations'}, axis=1, inplace=True)
+    return df
