@@ -104,10 +104,15 @@ def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
     b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
-  args.o_bias =1 
-  g = np.zeros(shape=(n_samples,args.num_envs))
-  g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=(half,args.num_envs) )
-  g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
+  # args.o_bias =1 
+  # g = np.zeros(shape=(n_samples,args.num_envs))
+  # g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=(half,args.num_envs) )
+  # g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
+  g = np.ones(args.num_applicants)*0.5 # legacy students shifted up
+  g[disadv_idx]=-0.5 # first-gen students shifted down
+  g += np.random.normal(1,0.2,size=args.num_applicants) # non-zero-mean
+  g = g[:, np.newaxis]
+
   return b, g, adv_idx, disadv_idx
 
 def compute_xt(EWi, b, theta, pref_vect, args):
@@ -158,7 +163,7 @@ def to_duplicate(sd, np, i):
 
 def generate_theta(i, args):
   if args.admit_all: # harris et. al settings. 
-    theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],args.num_applicants)
+    theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],args.num_applicants)
     return theta 
   else: # selection. in our settings, require theta to be repeating across a batch of students.
     assert args.num_applicants % args.applicants_per_round == 0
@@ -166,10 +171,10 @@ def generate_theta(i, args):
 
     td = to_duplicate(args.scaled_duplicates, args.no_protocol, i)
     if not td: # random vectors for every round
-      theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],n_rounds)
+      theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],n_rounds)
 
     else: # making sure there exists a scaled duplicate of each theta per round
-      theta = np.random.multivariate_normal([1,1],[[1, 0], [0, 1]],int(n_rounds / 2))
+      theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],int(n_rounds / 2))
   
       # scaled duplicate of each theta. 
       scale = np.random.uniform(low=0, high=2, size=(int(n_rounds/2),))
@@ -195,7 +200,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   if _theta_star is None:
     theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
   else:
-    theta_star[:, 1] = np.random.normal(loc=_theta_star, scale=0.2, size=(args.num_envs, ))
+    theta_star[:, 1] = _theta_star # np.random.normal(loc=_theta_star, scale=0.2, size=(args.num_envs, ))
 
   sigma_sat = 200
   sigma_gpa = 0.5
@@ -234,10 +239,10 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   
   # our setup addition 
   # computing admission results.
-  x_ = x.copy()
-  x_[:,0] = (x_[:,0] - 400) / 300
-  y_hat = (x_ * theta).sum(axis=-1)
-
+  y_hat_logits = (x * theta)
+  y_hat_logits = y_hat_logits - y_hat_logits.mean(axis=1, keepdims=True)
+  y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
+  y_hat = y_hat_logits.sum(axis=-1)
 
   def _get_selection(_y_hat, admit_all, n_rounds):
     if not admit_all:
@@ -349,7 +354,7 @@ def our2(x, y, theta, w):
 def run_multi_exp(seed, args, env_idx=None):
     np.random.seed(seed)
     b, x, y, EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect  = generate_data(
-    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args
+    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args, _theta_star=0.5
     )
 
     err_list = {}
