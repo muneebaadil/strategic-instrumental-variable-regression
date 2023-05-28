@@ -254,6 +254,10 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # y = np.matmul(x,theta_star) + g
   if args.clip:
     y = np.clip(y, 0, 4)
+  if args.normalize:
+    for i in range(args.num_envs):
+      (out,) = normalize((y[i],), new_min=0, new_max=4)
+      y[i] = out
   
   # our setup addition 
   # computing admission results.
