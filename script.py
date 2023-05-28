@@ -34,7 +34,7 @@ def get_args(cmd):
   parser.add_argument('--no-protocol', action='store_true')
 
   # algorithm
-  parser.add_argument('--methods', choices=('ols', '2sls', 'ours'), nargs='+', default='ours')
+  parser.add_argument('--methods', choices=('ols', 'ours_vseq', '2sls', 'ours'), nargs='+', default='ours')
 
   # experiment
   parser.add_argument('--test-run', action='store_true')
@@ -123,11 +123,9 @@ def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
   # g = np.zeros(shape=(n_samples,args.num_envs))
   # g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=(half,args.num_envs) )
   # g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
-  g = np.ones(args.num_applicants)*0.5 # legacy students shifted up
-  g[disadv_idx]=-0.5 # first-gen students shifted down
-  g += np.random.normal(1,0.2,size=args.num_applicants) # non-zero-mean
-  g = g[:, np.newaxis]
-
+  g = np.ones((args.num_applicants, args.num_envs))*0.5 # legacy students shifted up
+  g[disadv_idx, :]=-0.5 # first-gen students shifted down
+  g += np.random.normal(1,0.2,size=(args.num_applicants, args.num_envs)) # non-zero-mean
   return b, g, adv_idx, disadv_idx
 
 def compute_xt(EWi, b, theta, pref_vect, args):
@@ -317,6 +315,41 @@ def tsls(x,y,theta): # runs until round T
     np.linalg.inv(omega_hat_), lambda_hat_
   )
   return theta_hat_tsls_
+
+def our_vseq(x, y, w, applicants_per_round):
+    assert x.ndim == 2
+    n_applicants = x.shape[0]
+  
+    idx1, idx2, idx3 = 0, 0, 0
+  
+    A, b = [], []
+    for t in range(0, n_applicants, applicants_per_round*2):
+      w_t1 = w[t:t+applicants_per_round]
+      w_t2 = w[t+applicants_per_round:t+applicants_per_round+applicants_per_round]
+
+      x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
+      x_t2 = x[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
+
+      idx2 = int(idx1 + w_t1.sum())
+      idx3 = int(idx2 + w_t2.sum())
+
+      y_t1 = y[idx1:idx2]
+      y_t2 = y[idx2:idx3]
+
+      if idx2 > idx1 and idx3 > idx2: # if some data points pressent.
+        b.append(np.array([y_t2.mean() - y_t1.mean()]))
+        A.append(
+          x_t2.mean(axis=0, keepdims=True) - x_t1.mean(axis=0, keepdims=True)
+        )
+
+      idx1 = idx3
+  
+    assert idx1 == y.size, f'{idx1}, {y.size}'
+    A , b= np.concatenate(A, axis=0), np.concatenate(b)
+  
+    m = LinearRegression()
+    m.fit(A, b)
+    return m.coef_ 
 def our2(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
@@ -408,6 +441,8 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx):
         for m in args.methods:
             if m == 'ours':
                 est = our2(x_round, y_env_round_selected, theta_env_round, z_env_round)
+            elif m == 'ours_vseq':
+                est = our_vseq(x_round, y_env_round_selected, z_env_round, args.applicants_per_round)
             elif m == '2sls':
                 try:
                     est = tsls(x_round_selected, y_env_round_selected, theta_env_round_selected)
