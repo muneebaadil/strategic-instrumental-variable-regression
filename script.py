@@ -8,7 +8,7 @@ import pandas as pd
 # for notebook. 
 
 def get_git_revision_hash() -> str:
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 # %%
 def get_args(cmd):
   import argparse
@@ -23,6 +23,7 @@ def get_args(cmd):
   parser.add_argument('--fixed-effort-conversion', action='store_true')
   parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
   parser.add_argument('--clip', action='store_true')
+  parser.add_argument('--normalize', action='store_true')
   parser.add_argument('--b-bias', type=float, default=1.25)
   parser.add_argument('--save-dataset', action='store_true')
 
@@ -57,6 +58,20 @@ for i in (1, 0):
   for k in ('y', 'b', 'theta', 'o', 'theta_hat', 'b_mean', 'o_mean'):
     eqs_data[f'grp{i}_{k}'] = [] 
 # %%
+def normalize(arrs, new_min, new_max):
+  new_range = new_max - new_min
+  curr_min = np.concatenate(arrs).min()
+  curr_max = np.concatenate(arrs).max()
+
+  curr_range = curr_max - curr_min
+
+  out = []
+  for arr in arrs:
+    out.append(
+      (((arr - curr_min) / curr_range) * new_range) + new_min
+    )
+  return out
+
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
   assert adv_idx.max() < n_samples
   EWi = np.zeros(shape=(n_samples,2,2))
@@ -224,6 +239,11 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   # observable features x
   x = compute_xt(EWi, b, theta, pref_vect, args)
+
+  # normalize
+  if args.normalize:
+    (b[:, 0], x[:, 0]) = normalize((b[:, 0], x[:, 0]), new_min=400, new_max=1600)
+    (b[:, 1], x[:, 1]) = normalize((b[:, 1], x[:, 1]), new_min=0, new_max=4)
 
   # true outcomes (college gpa)
   # y = np.clip() # clipped outcomes
