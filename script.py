@@ -125,15 +125,25 @@ def compute_xt(EWi, b, theta, pref_vect, args):
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[1]
 
-  n_applicants = b.shape[0]
+  # x = np.zeros([n_applicants,b.shape[1]])
+  # for i in range(n_applicants):
+    # thetas_applicant = theta[:, i, :]
+    # assert thetas_applicant.shape == (args.num_envs, 2)
+    # thetai = thetas_applicant.T.dot(pref_vect)
+    # eet = EWi[i].dot(EWi[i].T)
+    # ans = np.matmul(eet, thetai)
+    # x[i] = b[i] + ans # optimal solution
+  
+  assert EWi.shape == (args.num_applicants, 2, 2)
+  assert theta.shape == (args.num_envs, args.num_applicants, 2)
+  assert pref_vect.shape == (args.num_envs,)
 
-  x = np.zeros([n_applicants,b.shape[1]])
-  for i in range(n_applicants):
-    thetas_applicant = theta[:, i, :]
-    assert thetas_applicant.shape == (args.num_envs, 2)
-    thetai = thetas_applicant.T.dot(pref_vect)
-    x[i] = b[i] + np.matmul(EWi[i].dot(EWi[i].T),thetai) # optimal solution
-
+  eet = np.matmul(EWi, np.transpose(EWi, axes=(0, 2, 1))) # (n_appl, 2, 2)
+  thetai = np.matmul(np.transpose(theta, axes=(1, -1, 0)), pref_vect) # (n_appl, 2 )
+  impr = np.matmul(eet, thetai[:, :, np.newaxis])[:, :, 0] # (n_appl, 2)
+  
+  x = b + impr
+  
   if args.clip:
     x[:,0] = np.clip(x[:,0],400,1600) # clip to 400 to 1600
     x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
