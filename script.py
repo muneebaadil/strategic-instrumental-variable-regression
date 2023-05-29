@@ -13,7 +13,6 @@ def get_git_revision_hash() -> str:
 def get_args(cmd):
   import argparse
   parser = argparse.ArgumentParser()
-  parser.add_argument('--n-cores', default=1, type=int)
 
   # dataset
   parser.add_argument('--num-repeat', default=10, type=int)
@@ -36,15 +35,8 @@ def get_args(cmd):
   # algorithm
   parser.add_argument('--methods', choices=('ols', 'ours_vseq', '2sls', 'ours'), nargs='+', default='ours')
 
-  # experiment
-  parser.add_argument('--test-run', action='store_true')
-  parser.add_argument('--experiment-root', type=str, default='experiments')
-  parser.add_argument('--experiment-name', type=str)
-
   # temporary
-  parser.add_argument('--generate', default=1, choices=[1,2], type=int)
   parser.add_argument('--stream', action='store_true')
-  parser.add_argument('--hack', action='store_true')
   
   if cmd is None:
     args = parser.parse_args()
@@ -254,10 +246,6 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # y = np.matmul(x,theta_star) + g
   if args.clip:
     y = np.clip(y, 0, 4)
-  if args.normalize:
-    for i in range(args.num_envs):
-      (out,) = normalize((y[i],), new_min=0, new_max=4)
-      y[i] = out
   
   # our setup addition 
   # computing admission results.
@@ -408,7 +396,7 @@ def our2(x, y, theta, w):
   theta_star_est = m.coef_ 
   return theta_star_est
 #%%
-def run_multi_exp(seed, args, env_idx=None):
+def run_multi_env(seed, args, env_idx=None):
     np.random.seed(seed)
     b, x, y, EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect  = generate_data(
     args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args, _theta_star=0.5
