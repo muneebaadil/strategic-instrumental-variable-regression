@@ -24,6 +24,7 @@ def get_args(cmd):
   parser.add_argument('--clip', action='store_true')
   parser.add_argument('--normalize', action='store_true')
   parser.add_argument('--b-bias', type=float, default=1.25)
+  parser.add_argument('--theta-star-std', type=float, default=0)
   parser.add_argument('--save-dataset', action='store_true')
 
   # multienv
@@ -200,12 +201,9 @@ def generate_theta(i, args):
     assert theta.shape[0] == args.num_applicants
     return theta
 
-def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args, _theta_star=None):
+def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args):
   theta_star = np.zeros(shape=(args.num_envs, 2))
-  if _theta_star is None:
-    theta_star[:, 1] = np.random.normal(loc=0.5, scale=0.2, size=(args.num_envs,))
-  else:
-    theta_star[:, 1] = _theta_star # np.random.normal(loc=_theta_star, scale=0.2, size=(args.num_envs, ))
+  theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
 
   sigma_sat = 200
   sigma_gpa = 0.5
@@ -399,7 +397,7 @@ def our2(x, y, theta, w):
 def run_multi_env(seed, args, env_idx=None):
     np.random.seed(seed)
     b, x, y, EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect  = generate_data(
-    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args, _theta_star=0.5
+    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args
     )
 
     err_list = {}
