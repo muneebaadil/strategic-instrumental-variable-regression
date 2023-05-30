@@ -32,17 +32,23 @@ def get_args(cmd):
   parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
   parser.add_argument('--prob', default=0.5, type=float)
   parser.add_argument('--no-protocol', action='store_true')
+  parser.add_argument('--envs-accept-rates', nargs='+', default=[1.00], type=float)
 
   # algorithm
   parser.add_argument('--methods', choices=('ols', 'ours_vseq', '2sls', 'ours'), nargs='+', default='ours')
 
-  # temporary
-  parser.add_argument('--stream', action='store_true')
+  # misc
+  parser.add_argument('--offline-eval', action='store_true')
   
   if cmd is None:
     args = parser.parse_args()
   else:
     args = parser.parse_args(cmd.split(' '))
+  
+  if len(args.envs_accept_rates) == 1:
+    args.envs_accept_rates = [args.envs_accept_rates[0]] * args.num_envs
+  
+  assert len(args.envs_accept_rates) == args.num_envs
   return args
 
 
@@ -149,13 +155,15 @@ def compute_xt(EWi, b, theta, pref_vect, args):
     x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
   return x
 
-def get_selection(y_hat):
+def get_selection(y_hat, accept_rate):
   assert y_hat.ndim == 1
   n_applicants = y_hat.shape[0]
   w = np.zeros_like(y_hat)
   for i, _y_hat in enumerate(y_hat):
     y_hat_peers = y_hat[np.arange(n_applicants) != i] # scores of everyone but the current applicant
     prob = np.mean(y_hat_peers <= _y_hat)
+    if (1-prob) > accept_rate:
+      prob = 0
     w[i] = np.random.binomial(n=1, p=prob)
   return w
 
@@ -262,14 +270,14 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
   y_hat = y_hat_logits.sum(axis=-1)
 
-  def _get_selection(_y_hat, admit_all, n_rounds):
+  def _get_selection(_y_hat, admit_all, n_rounds, accept_rate):
     if not admit_all:
       _w = np.zeros_like(_y_hat)
-      # comparing people coming in the same rounds. 
+      # comparing applicants coming in the same rounds. 
       for r in range(n_rounds):
         _y_hat_r = _y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
   
-        w_r = get_selection(_y_hat_r)
+        w_r = get_selection(_y_hat_r, accept_rate)
         _w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
     else:
       _w = np.ones_like(y_hat)
@@ -277,7 +285,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
-    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds)
+    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx])
 
   z = np.zeros((args.num_applicants, ))
   for idx in range(args.num_applicants):
@@ -425,6 +433,8 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx):
     z_env = z==env_idx+1
         
     upp_limits = [x for x in range(args.applicants_per_round*2, args.num_applicants+1, args.applicants_per_round)]
+    if args.offline_eval:
+      upp_limits = [args.num_applicants]
         
     err_list = {m: [None] * len(upp_limits) for m in args.methods}
     for i, t in tqdm(enumerate(upp_limits)):
