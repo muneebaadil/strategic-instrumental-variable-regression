@@ -25,6 +25,8 @@ def get_args(cmd):
   parser.add_argument('--normalize', action='store_true')
   parser.add_argument('--b-bias', type=float, default=1.25)
   parser.add_argument('--theta-star-std', type=float, default=0)
+  parser.add_argument('--theta-per-env', action='store_true')
+  parser.add_argument('--hs-gpa-std', type=float, default=1)
   parser.add_argument('--save-dataset', action='store_true')
 
   # multienv
@@ -187,7 +189,7 @@ def to_duplicate(sd, np, i):
 
 def generate_theta(i, args):
   if args.admit_all: # harris et. al settings. 
-    theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],args.num_applicants)
+    theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],args.num_applicants)
     return theta 
   else: # selection. in our settings, require theta to be repeating across a batch of students.
     assert args.num_applicants % args.applicants_per_round == 0
@@ -195,10 +197,10 @@ def generate_theta(i, args):
 
     td = to_duplicate(args.scaled_duplicates, args.no_protocol, i)
     if not td: # random vectors for every round
-      theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],n_rounds)
+      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],n_rounds)
 
     else: # making sure there exists a scaled duplicate of each theta per round
-      theta = np.random.multivariate_normal([1,1],[[10, 0], [0, 2]],int(n_rounds / 2))
+      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],int(n_rounds / 2))
   
       # scaled duplicate of each theta. 
       scale = np.random.uniform(low=0, high=2, size=(int(n_rounds/2),))
@@ -265,9 +267,11 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   
   # our setup addition 
   # computing admission results.
-  y_hat_logits = (x * theta)
-  y_hat_logits = y_hat_logits - y_hat_logits.mean(axis=1, keepdims=True)
-  y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
+  x_norm = (x - x.mean(axis=0, keepdims=True) ) / x.std(axis=0, keepdims=True)
+  x_norm = x_norm[np.newaxis]
+  y_hat_logits = (x_norm * theta)
+  # y_hat_logits = y_hat_logits - y_hat_logits.mean(axis=1, keepdims=True)
+  # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
   y_hat = y_hat_logits.sum(axis=-1)
 
   def _get_selection(_y_hat, admit_all, n_rounds, accept_rate):
