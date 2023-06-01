@@ -162,10 +162,12 @@ def get_selection(y_hat, accept_rate):
   n_applicants = y_hat.shape[0]
   w = np.zeros_like(y_hat)
   for i, _y_hat in enumerate(y_hat):
-    y_hat_peers = y_hat[np.arange(n_applicants) != i] # scores of everyone but the current applicant
+    y_hat_peers = y_hat[np.arange(n_applicants) >= 0] # scores of everyone but the current applicant
     prob = np.mean(y_hat_peers <= _y_hat)
     if (1-prob) > accept_rate:
       prob = 0
+    else:
+      prob = 1
     w[i] = np.random.binomial(n=1, p=prob)
   return w
 
@@ -429,7 +431,7 @@ def run_multi_env(seed, args, env_idx=None):
         for k, v in dictenv.items():
             err_list[f'{k}_env{env_idx}'] = v
     
-    return err_list
+    return err_list, w, z
 
 def run_single_env(args, x, y, theta, z, theta_star, env_idx):
     y_env = y[env_idx].flatten() 
