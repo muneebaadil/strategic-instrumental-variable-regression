@@ -35,6 +35,7 @@ def get_args(cmd):
   parser.add_argument('--prob', default=0.5, type=float)
   parser.add_argument('--no-protocol', action='store_true')
   parser.add_argument('--envs-accept-rates', nargs='+', default=[1.00], type=float)
+  parser.add_argument('--pref-vect', nargs='+', default=[1.00], type=float)
 
   # algorithm
   parser.add_argument('--methods', choices=('ols', 'ours_vseq', '2sls', 'ours'), nargs='+', default='ours')
@@ -49,8 +50,12 @@ def get_args(cmd):
   
   if len(args.envs_accept_rates) == 1:
     args.envs_accept_rates = [args.envs_accept_rates[0]] * args.num_envs
+  if len(args.pref_vect) == 1:
+    args.pref_vect = [args.pref_vect[0]] * args.num_envs
+  args.pref_vect = args.pref_vect / np.sum(args.pref_vect)
   
   assert len(args.envs_accept_rates) == args.num_envs
+  assert len(args.pref_vect) == args.num_envs
   return args
 
 
@@ -163,6 +168,7 @@ def get_selection(y_hat, accept_rate):
   w = np.zeros_like(y_hat)
   for i, _y_hat in enumerate(y_hat):
     y_hat_peers = y_hat[np.arange(n_applicants) >= 0] # scores of everyone but the current applicant
+    y_hat_peers = y_hat
     prob = np.mean(y_hat_peers <= _y_hat)
     if (1-prob) > accept_rate:
       prob = 0
@@ -230,12 +236,6 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   sigma_sat = 200
   sigma_gpa = 0.5
 
-  if args.pref == 'uniform':
-    pref_vect = np.ones(shape=(args.num_envs,))
-    pref_vect = pref_vect / np.sum(pref_vect)
-  elif args.pref == 'geometric':
-    pref_vect = ((1 - args.prob) ** np.arange(args.num_envs)) * args.prob
-    pref_vect = pref_vect / np.sum(pref_vect)
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, sigma_sat, sigma_gpa, args)
 
   # assessment rule 
@@ -248,7 +248,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   EWi = sample_effort_conversion(EW, num_applicants, adv_idx, fixed_effort_conversion)
 
   # observable features x
-  x = compute_xt(EWi, b, theta, pref_vect, args)
+  x = compute_xt(EWi, b, theta, args.pref_vect, args)
 
   # normalize
   if args.normalize:
@@ -299,11 +299,11 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
     if w_idx.sum() == 0: # applicant is not accepted anywhere
       z[idx] = 0
     else:
-      pvals = w_idx * pref_vect / (w_idx * pref_vect).sum()
+      pvals = w_idx * args.pref_vect / (w_idx * args.pref_vect).sum()
       temp = np.random.multinomial(n=1, pvals=pvals, size=1)
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx+1 # offset to avoid conflict with "no uni" decision
-  return b,x,y,EW,theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, pref_vect
+  return b,x,y,EW,theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
 
 # %%
 def ols(x,y):
