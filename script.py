@@ -52,8 +52,9 @@ def get_args(cmd):
     args.envs_accept_rates = [args.envs_accept_rates[0]] * args.num_envs
   if len(args.pref_vect) == 1:
     args.pref_vect = [args.pref_vect[0]] * args.num_envs
-  args.pref_vect = args.pref_vect / np.sum(args.pref_vect)
-  
+  args.pref_vect = [p/sum(args.pref_vect) for p in args.pref_vect]
+  args.pref_vect = np.array(args.pref_vect)
+
   assert len(args.envs_accept_rates) == args.num_envs
   assert len(args.pref_vect) == args.num_envs
   return args
