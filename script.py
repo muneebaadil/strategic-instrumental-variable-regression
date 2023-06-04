@@ -139,6 +139,7 @@ def compute_xt(EWi, b, theta, pref_vect, args):
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[1]
 
+  # n_applicants =b.shape[0]
   # x = np.zeros([n_applicants,b.shape[1]])
   # for i in range(n_applicants):
     # thetas_applicant = theta[:, i, :]
@@ -210,7 +211,7 @@ def generate_theta(i, args):
 
     else: # making sure there exists a scaled duplicate of each theta per round
       theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],int(n_rounds / 2))
-  
+      assert theta.shape == (int(n_rounds/2), 2)
       # scaled duplicate of each theta. 
       scale = np.random.uniform(low=0, high=2, size=(int(n_rounds/2),))
       scale = np.diag(v=scale)
@@ -313,10 +314,15 @@ def ols(x,y):
   theta_hat_ols_ = model.coef_
   return theta_hat_ols_
   
-def tsls(x,y,theta): # runs until round T
+def tsls(x,y,theta, pref_vect): # runs until round T
   # my implementation
   # regress x onto theta: estimate omega
   model = LinearRegression()
+
+  _pref_vect = pref_vect.reshape((pref_vect.shape[0], 1, 1))
+  theta = (theta * _pref_vect).sum(axis=0)
+  assert theta.shape == (y.shape[0], 2)
+
   model.fit(theta, x)
   omega_hat_ = model.coef_.T
 
@@ -428,13 +434,13 @@ def run_multi_env(seed, args, env_idx=None):
     err_list = {}
     envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
     for env_idx in envs_itr:
-        dictenv = run_single_env(args, x, y, theta, z, theta_star, env_idx)
+        dictenv = run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW)
         for k, v in dictenv.items():
             err_list[f'{k}_env{env_idx}'] = v
     
     return err_list, w, z
 
-def run_single_env(args, x, y, theta, z, theta_star, env_idx):
+def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
     y_env = y[env_idx].flatten() 
     theta_env = theta[env_idx]
     z_env = z==env_idx+1
@@ -454,6 +460,8 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx):
         y_env_round_selected = y_env_round[z_env_round]
         x_round_selected = x_round[z_env_round]
         theta_env_round_selected = theta_env_round[z_env_round]
+        theta_round_selected = theta[:, :t][:, z_env_round]
+        assert theta_round_selected.shape == (args.num_envs, z_env_round.sum(), 2)
 
         for m in args.methods:
             if m == 'ours':
@@ -462,7 +470,7 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx):
                 est = our_vseq(x_round, y_env_round_selected, z_env_round, args.applicants_per_round)
             elif m == '2sls':
                 try:
-                    est = tsls(x_round_selected, y_env_round_selected, theta_env_round_selected)
+                    est = tsls(x_round_selected, y_env_round_selected, theta_round_selected, pref_vect)
                 except np.linalg.LinAlgError:
                     est = np.array([np.nan, np.nan])
             elif m == 'ols':
