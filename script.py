@@ -20,13 +20,13 @@ def get_args(cmd):
   parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
   parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
   parser.add_argument('--fixed-effort-conversion', action='store_true')
-  parser.add_argument('--scaled-duplicates', default=None, choices=['random', 'sequence', None], type=str)
+  parser.add_argument('--scaled-duplicates', default=None, choices=['sequence', None], type=str)
+  parser.add_argument('--num-cooperative-envs', default=None, type=int)
   parser.add_argument('--clip', action='store_true')
   parser.add_argument('--normalize', action='store_true')
   parser.add_argument('--b-bias', type=float, default=1.25)
   parser.add_argument('--theta-star-std', type=float, default=0)
   parser.add_argument('--theta-per-env', action='store_true')
-  parser.add_argument('--hs-gpa-std', type=float, default=1)
   parser.add_argument('--save-dataset', action='store_true')
 
   # multienv
@@ -54,6 +54,9 @@ def get_args(cmd):
     args.pref_vect = [args.pref_vect[0]] * args.num_envs
   args.pref_vect = [p/sum(args.pref_vect) for p in args.pref_vect]
   args.pref_vect = np.array(args.pref_vect)
+
+  if args.num_cooperative_envs is None:
+    args.num_cooperative_envs = args.num_envs # by default, everyone is cooperative
 
   assert len(args.envs_accept_rates) == args.num_envs
   assert len(args.pref_vect) == args.num_envs
@@ -180,51 +183,61 @@ def get_selection(y_hat, accept_rate):
   return w
 
 def generate_thetas(args):
-  thetas = [generate_theta(i, args) for i in range(args.num_envs)]
+  deploy_sd_every = 2
+  thetas = []
+  for i in range(args.num_envs):
+    if i < args.num_cooperative_envs: # cooperative env.
+      thetas.append(generate_theta(i, args, 1))
+    else: # non-cooperative env.
+      thetas.append(generate_theta(i, args, deploy_sd_every))
+      deploy_sd_every += 1 
+      
   thetas = np.stack(thetas)
   return thetas
 
 
-def to_duplicate(sd, np, i):
-  if sd is None:
-    return False
-  else:
-    if np==False:
-      return True
-    else:
-      if i==0:
-        return True
-      else:
-        return False
+def distribute(n_rounds, theta, theta_scaled, deploy_sd_every):
+    theta_temp = np.zeros((n_rounds,2 ))
+    j = 0
+    for i in range(deploy_sd_every, int(n_rounds/2), deploy_sd_every):
+        theta_temp [j:j+deploy_sd_every ] = theta[i-deploy_sd_every: i]
+        theta_temp[j+deploy_sd_every: j + deploy_sd_every + deploy_sd_every ] = theta_scaled[i - deploy_sd_every: i]
+     
+        j = j + 2*deploy_sd_every
 
-def generate_theta(i, args):
+    # residual from the first vector
+    theta_temp[j: j + int(n_rounds/2) - i] = theta[i:] 
+    j = j + int(n_rounds/2) - i
+
+    # residual from the second vector 
+    theta_temp[j: j + int(n_rounds/2) - i] = theta_scaled [i:]
+    return theta_temp 
+
+def generate_theta(i, args, deploy_sd_every ):
   if args.admit_all: # harris et. al settings. 
-    theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],args.num_applicants)
+    theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],args.num_applicants)
     return theta 
   else: # selection. in our settings, require theta to be repeating across a batch of students.
     assert args.num_applicants % args.applicants_per_round == 0
     n_rounds = int(args.num_applicants / args.applicants_per_round)
 
-    td = to_duplicate(args.scaled_duplicates, args.no_protocol, i)
-    if not td: # random vectors for every round
-      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],n_rounds)
+    if args.scaled_duplicates is None: # random vectors for every round
+      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],n_rounds)
 
-    else: # making sure there exists a scaled duplicate of each theta per round
-      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, args.hs_gpa_std]],int(n_rounds / 2))
+    elif args.scaled_duplicates == 'sequence': # making sure there exists a scaled duplicate of each theta per round
+      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],int(n_rounds / 2))
       assert theta.shape == (int(n_rounds/2), 2)
+
       # scaled duplicate of each theta. 
       scale = np.random.uniform(low=0, high=2, size=(int(n_rounds/2),))
       scale = np.diag(v=scale)
       theta_scaled = scale.dot(theta)
   
-      if args.scaled_duplicates=='random':
-        theta = np.concatenate((theta, theta_scaled))
-        np.random.shuffle(theta)
-      elif args.scaled_duplicates=='sequence':
-        theta_temp = np.zeros((n_rounds,2))
-        theta_temp[0::2] = theta
-        theta_temp[1::2] = theta_scaled
-        theta = theta_temp
+      theta = distribute(n_rounds, theta, theta_scaled, deploy_sd_every)
+      # theta_temp = np.zeros((n_rounds,2))
+      # theta_temp[0::2] = theta
+      # theta_temp[1::2] = theta_scaled
+      # theta = theta_temp
 
     # theta repeating over the rounds.
     theta = np.repeat(theta, repeats=args.applicants_per_round, axis=0)
@@ -371,18 +384,59 @@ def our_vseq(x, y, w, applicants_per_round):
     m = LinearRegression()
     m.fit(A, b)
     return m.coef_ 
+
+def our_vseq_debug(x, y, w, applicants_per_round, o):
+    assert x.ndim == 2
+    n_applicants = x.shape[0]
+  
+    idx1, idx2, idx3 = 0, 0, 0
+  
+    A, b, Os = [], [], []
+    for t in range(0, n_applicants, applicants_per_round*2):
+      w_t1 = w[t:t+applicants_per_round]
+      w_t2 = w[t+applicants_per_round:t+applicants_per_round+applicants_per_round]
+
+      x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
+      x_t2 = x[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
+
+      o_t1 = o[t:t+applicants_per_round][w_t1 == 1]
+      o_t2 = o[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
+
+      idx2 = int(idx1 + w_t1.sum())
+      idx3 = int(idx2 + w_t2.sum())
+
+      y_t1 = y[idx1:idx2]
+      y_t2 = y[idx2:idx3]
+
+      if idx2 > idx1 and idx3 > idx2: # if some data points pressent.
+        b.append(np.array([y_t2.mean() - y_t1.mean()]))
+        A.append(
+          x_t2.mean(axis=0, keepdims=True) - x_t1.mean(axis=0, keepdims=True)
+        )
+        Os.append(
+           (o_t1.mean(), o_t2.mean())
+        )
+
+      idx1 = idx3
+  
+    assert idx1 == y.size, f'{idx1}, {y.size}'
+    A , b= np.concatenate(A, axis=0), np.concatenate(b)
+  
+    m = LinearRegression()
+    m.fit(A, b)
+    return m.coef_ , Os 
 def our2(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
-  omega_hat_ = model.coef_.T # EET estimate. 
 
   # recover scaled duplicate 
   theta_admit = theta[w==1]
   x_admit = x[w==1]
-  theta_admit_, counts = np.unique(theta_admit, axis=0, return_counts=True)
+  theta_admit_unique, counts = np.unique(theta_admit, axis=0, return_counts=True)
+
   # to use thetas having the most number of applicants
   idx = np.argsort(counts); idx = idx[::-1]
-  theta_admit_ = theta_admit_[idx]
+  theta_admit_unique = theta_admit_unique [idx]
 
   # construct linear system of eqs.
   assert theta_admit.shape[1] > 1 # algo not applicable for only one feature.
@@ -392,12 +446,14 @@ def our2(x, y, theta, w):
   A, b = [], []
 
   i = 0
-  while (i < theta_admit_.shape[0]):
+  while (i < theta_admit_unique.shape[0]):
     j = i+1
-    while (j < theta_admit_.shape[0]):
-      pair = theta_admit_[[i,j]]
+    found_pair = False
+    while (j < theta_admit_unique.shape[0]) and (found_pair==False):
+      pair = theta_admit_unique[[i,j]]
 
       if np.linalg.matrix_rank(pair) == 1: # if scalar multiple, and exact duplicates are ruled out.
+        found_pair =True
         idx_grp1 = np.all(theta_admit == pair[1], axis=-1)
         idx_grp0 = np.all(theta_admit == pair[0], axis=-1)
         est1 = y[idx_grp1].mean()
