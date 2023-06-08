@@ -168,19 +168,16 @@ def compute_xt(EWi, b, theta, pref_vect, args):
   return x
 
 def get_selection(y_hat, accept_rate):
-  assert y_hat.ndim == 1
-  n_applicants = y_hat.shape[0]
-  w = np.zeros_like(y_hat)
-  for i, _y_hat in enumerate(y_hat):
-    y_hat_peers = y_hat[np.arange(n_applicants) >= 0] # scores of everyone but the current applicant
-    y_hat_peers = y_hat
-    prob = np.mean(y_hat_peers <= _y_hat)
-    if (1-prob) > accept_rate:
-      prob = 0
-    else:
-      prob = 1
-    w[i] = np.random.binomial(n=1, p=prob)
-  return w
+  sort_idx = np.argsort(y_hat )
+  
+  thres = int((1-accept_rate) * sort_idx.size) -1 
+  rejected_idx = sort_idx[:thres]
+  accepted_idx = sort_idx[thres: ]
+  
+  w_test = np.zeros_like(y_hat  )
+  w_test[accepted_idx] = True
+  w_test[rejected_idx] = False
+  return w_test 
 
 def generate_thetas(args):
   deploy_sd_every = 2
