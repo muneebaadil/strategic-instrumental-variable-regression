@@ -28,6 +28,7 @@ def get_args(cmd):
   parser.add_argument('--theta-star-std', type=float, default=0)
   parser.add_argument('--theta-per-env', action='store_true')
   parser.add_argument('--save-dataset', action='store_true')
+  parser.add_argument('--rank-type', type=str, default='prediction', choices=('prediction', 'uniform'))
 
   # multienv
   parser.add_argument('--num-envs', default=1, type=int)
@@ -167,16 +168,25 @@ def compute_xt(EWi, b, theta, pref_vect, args):
     x[:,1] = np.clip(x[:,1],0,4) # clip to 0 to 4.0
   return x
 
-def get_selection(y_hat, accept_rate):
-  sort_idx = np.argsort(y_hat )
+def get_selection(y_hat, accept_rate, rank_type):
+  if rank_type == 'prediction':
+    sort_idx = np.argsort(y_hat )
   
-  thres = int((1-accept_rate) * sort_idx.size) -1 
-  rejected_idx = sort_idx[:thres]
-  accepted_idx = sort_idx[thres: ]
+    thres = int((1-accept_rate) * sort_idx.size) 
+    rejected_idx = sort_idx[:thres]
+    accepted_idx = sort_idx[thres: ]
   
-  w_test = np.zeros_like(y_hat  )
-  w_test[accepted_idx] = True
-  w_test[rejected_idx] = False
+    w_test = np.zeros_like(y_hat)
+    w_test[accepted_idx] = True
+    w_test[rejected_idx] = False
+  
+  elif rank_type == 'uniform':
+     w_test = np.zeros_like(y_hat)
+     idx = np.arange(y_hat.size )
+     np.random.shuffle(idx)
+     idx = idx[int((1-accept_rate) * y_hat.size) :]
+     w_test = np.zeros_like(y_hat )
+     w_test[idx ] = True 
   return w_test 
 
 def generate_thetas(args):
@@ -288,14 +298,14 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
   y_hat = y_hat_logits.sum(axis=-1)
 
-  def _get_selection(_y_hat, admit_all, n_rounds, accept_rate):
+  def _get_selection(_y_hat, admit_all, n_rounds, accept_rate, rank_type):
     if not admit_all:
       _w = np.zeros_like(_y_hat)
       # comparing applicants coming in the same rounds. 
       for r in range(n_rounds):
         _y_hat_r = _y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
   
-        w_r = get_selection(_y_hat_r, accept_rate)
+        w_r = get_selection(_y_hat_r, accept_rate, rank_type)
         _w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
     else:
       _w = np.ones_like(y_hat)
@@ -303,7 +313,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
-    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx])
+    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx], args.rank_type)
 
   z = np.zeros((args.num_applicants, ))
   for idx in range(args.num_applicants):
