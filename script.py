@@ -361,77 +361,32 @@ def our_vseq(x, y, w, applicants_per_round):
     assert x.ndim == 2
     n_applicants = x.shape[0]
   
-    idx1, idx2, idx3 = 0, 0, 0
-  
     A, b = [], []
     for t in range(0, n_applicants, applicants_per_round*2):
-      w_t1 = w[t:t+applicants_per_round]
-      w_t2 = w[t+applicants_per_round:t+applicants_per_round+applicants_per_round]
+      x_t1, x_t2, y_t1, y_t2 = get_datapoints(x, y, w, applicants_per_round, t, t+applicants_per_round)
 
-      x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
-      x_t2 = x[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
-
-      idx2 = int(idx1 + w_t1.sum())
-      idx3 = int(idx2 + w_t2.sum())
-
-      y_t1 = y[idx1:idx2]
-      y_t2 = y[idx2:idx3]
-
-      if idx2 > idx1 and idx3 > idx2: # if some data points pressent.
+      if y_t1.size > 0 and y_t2.size > 0: # if some data points pressent.
         b.append(np.array([y_t2.mean() - y_t1.mean()]))
         A.append(
           x_t2.mean(axis=0, keepdims=True) - x_t1.mean(axis=0, keepdims=True)
         )
-
-      idx1 = idx3
   
-    assert idx1 == y.size, f'{idx1}, {y.size}'
     A , b= np.concatenate(A, axis=0), np.concatenate(b)
-  
     m = LinearRegression()
     m.fit(A, b)
     return m.coef_ 
 
-def our_vseq_debug(x, y, w, applicants_per_round, o):
-    assert x.ndim == 2
-    n_applicants = x.shape[0]
-  
-    idx1, idx2, idx3 = 0, 0, 0
-  
-    A, b, Os = [], [], []
-    for t in range(0, n_applicants, applicants_per_round*2):
-      w_t1 = w[t:t+applicants_per_round]
-      w_t2 = w[t+applicants_per_round:t+applicants_per_round+applicants_per_round]
+def get_datapoints(x, y, w, applicants_per_round, t, t2):
+    w_t1 = w[t:t+applicants_per_round]
+    w_t2 = w[t2:t2+applicants_per_round]
 
-      x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
-      x_t2 = x[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
+    x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
+    x_t2 = x[t2:t2+applicants_per_round][w_t2 == 1]
 
-      o_t1 = o[t:t+applicants_per_round][w_t1 == 1]
-      o_t2 = o[t+applicants_per_round:t+applicants_per_round+applicants_per_round][w_t2 == 1]
+    y_t1 = y[t:t+applicants_per_round][w_t1 == 1]
+    y_t2 = y[t2:t2+applicants_per_round][w_t2 == 1]
+    return x_t1,x_t2,y_t1,y_t2
 
-      idx2 = int(idx1 + w_t1.sum())
-      idx3 = int(idx2 + w_t2.sum())
-
-      y_t1 = y[idx1:idx2]
-      y_t2 = y[idx2:idx3]
-
-      if idx2 > idx1 and idx3 > idx2: # if some data points pressent.
-        b.append(np.array([y_t2.mean() - y_t1.mean()]))
-        A.append(
-          x_t2.mean(axis=0, keepdims=True) - x_t1.mean(axis=0, keepdims=True)
-        )
-        Os.append(
-           (o_t1.mean(), o_t2.mean())
-        )
-
-      idx1 = idx3
-  
-    assert idx1 == y.size, f'{idx1}, {y.size}'
-    A , b= np.concatenate(A, axis=0), np.concatenate(b)
-  
-    m = LinearRegression()
-    m.fit(A, b)
-    return m.coef_ , Os 
 def our2(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
@@ -530,7 +485,7 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
             if m == 'ours':
                 est = our2(x_round, y_env_round_selected, theta_env_round, z_env_round)
             elif m == 'ours_vseq':
-                est = our_vseq(x_round, y_env_round_selected, z_env_round, args.applicants_per_round)
+                est = our_vseq(x_round, y_env_round, z_env_round, args.applicants_per_round)
             elif m == '2sls':
                 try:
                     est = tsls(x_round_selected, y_env_round_selected, theta_round_selected, pref_vect)
