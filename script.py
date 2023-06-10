@@ -39,10 +39,11 @@ def get_args(cmd):
   parser.add_argument('--pref-vect', nargs='+', default=[1.00], type=float)
 
   # algorithm
-  parser.add_argument('--methods', choices=('ols', 'ours_vseq', '2sls', 'ours'), nargs='+', default='ours')
+  parser.add_argument('--methods', choices=('ols', '2sls', 'ours'), nargs='+', default='ours')
 
   # misc
-  parser.add_argument('--offline-eval', action='store_true')
+  parser.add_argument('--offline-eval', action='store_true', help='evaluate '
+                      'the algorithms only once for the entire dataset together.')
   
   if cmd is None:
     args = parser.parse_args()
@@ -130,10 +131,6 @@ def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
     b[:,1] = np.clip(b[:,1],0,4) # clip to 0 to 4.0
 
   # confounding error term g (error on true college GPA)
-  # args.o_bias =1 
-  # g = np.zeros(shape=(n_samples,args.num_envs))
-  # g[adv_idx] = np.random.normal((args.o_bias / 2.), scale=0.2, size=(half,args.num_envs) )
-  # g[disadv_idx] = np.random.normal(-(args.o_bias / 2.), scale=0.2, size=(half, args.num_envs))
   g = np.ones((args.num_applicants, args.num_envs))*0.5 # legacy students shifted up
   g[disadv_idx, :]=-0.5 # first-gen students shifted down
   g += np.random.normal(1,0.2,size=(args.num_applicants, args.num_envs)) # non-zero-mean
@@ -143,16 +140,6 @@ def compute_xt(EWi, b, theta, pref_vect, args):
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[1]
 
-  # n_applicants =b.shape[0]
-  # x = np.zeros([n_applicants,b.shape[1]])
-  # for i in range(n_applicants):
-    # thetas_applicant = theta[:, i, :]
-    # assert thetas_applicant.shape == (args.num_envs, 2)
-    # thetai = thetas_applicant.T.dot(pref_vect)
-    # eet = EWi[i].dot(EWi[i].T)
-    # ans = np.matmul(eet, thetai)
-    # x[i] = b[i] + ans # optimal solution
-  
   assert EWi.shape == (args.num_applicants, 2, 2)
   assert theta.shape == (args.num_envs, args.num_applicants, 2)
   assert pref_vect.shape == (args.num_envs,)
@@ -241,10 +228,6 @@ def generate_theta(i, args, deploy_sd_every ):
       theta_scaled = scale.dot(theta)
   
       theta = distribute(n_rounds, theta, theta_scaled, deploy_sd_every)
-      # theta_temp = np.zeros((n_rounds,2))
-      # theta_temp[0::2] = theta
-      # theta_temp[1::2] = theta_scaled
-      # theta = theta_temp
 
     # theta repeating over the rounds.
     theta = np.repeat(theta, repeats=args.applicants_per_round, axis=0)
@@ -313,7 +296,9 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
 
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
-    w[env_idx ] = _get_selection(y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx], args.rank_type)
+    w[env_idx ] = _get_selection(
+      y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx], args.rank_type
+      )
 
   z = np.zeros((args.num_applicants, ))
   for idx in range(args.num_applicants):
@@ -357,37 +342,7 @@ def tsls(x,y,theta, pref_vect): # runs until round T
   )
   return theta_hat_tsls_
 
-def our_vseq(x, y, w, applicants_per_round):
-    assert x.ndim == 2
-    n_applicants = x.shape[0]
-  
-    A, b = [], []
-    for t in range(0, n_applicants, applicants_per_round*2):
-      x_t1, x_t2, y_t1, y_t2 = get_datapoints(x, y, w, applicants_per_round, t, t+applicants_per_round)
-
-      if y_t1.size > 0 and y_t2.size > 0: # if some data points pressent.
-        b.append(np.array([y_t2.mean() - y_t1.mean()]))
-        A.append(
-          x_t2.mean(axis=0, keepdims=True) - x_t1.mean(axis=0, keepdims=True)
-        )
-  
-    A , b= np.concatenate(A, axis=0), np.concatenate(b)
-    m = LinearRegression()
-    m.fit(A, b)
-    return m.coef_ 
-
-def get_datapoints(x, y, w, applicants_per_round, t, t2):
-    w_t1 = w[t:t+applicants_per_round]
-    w_t2 = w[t2:t2+applicants_per_round]
-
-    x_t1 = x[t:t+applicants_per_round][w_t1 == 1]
-    x_t2 = x[t2:t2+applicants_per_round][w_t2 == 1]
-
-    y_t1 = y[t:t+applicants_per_round][w_t1 == 1]
-    y_t2 = y[t2:t2+applicants_per_round][w_t2 == 1]
-    return x_t1,x_t2,y_t1,y_t2
-
-def our2(x, y, theta, w):
+def our(x, y, theta, w):
   model = LinearRegression()
   model.fit(theta, x)
 
@@ -483,9 +438,7 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
 
         for m in args.methods:
             if m == 'ours':
-                est = our2(x_round, y_env_round_selected, theta_env_round, z_env_round)
-            elif m == 'ours_vseq':
-                est = our_vseq(x_round, y_env_round, z_env_round, args.applicants_per_round)
+                est = our(x_round, y_env_round_selected, theta_env_round, z_env_round)
             elif m == '2sls':
                 try:
                     est = tsls(x_round_selected, y_env_round_selected, theta_round_selected, pref_vect)
