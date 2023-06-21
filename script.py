@@ -15,27 +15,19 @@ def get_args(cmd):
   parser = argparse.ArgumentParser()
 
   # dataset
-  parser.add_argument('--num-repeat', default=10, type=int)
   parser.add_argument('--num-applicants', default=10000, type=int)
-  parser.add_argument('--admit-all', action='store_true', help='admit all students, as in Harris et. al')
   parser.add_argument('--applicants-per-round', default=1, type=int, help='used for identical thetas')
   parser.add_argument('--fixed-effort-conversion', action='store_true')
   parser.add_argument('--scaled-duplicates', default=None, choices=['sequence', None], type=str)
   parser.add_argument('--num-cooperative-envs', default=None, type=int)
   parser.add_argument('--clip', action='store_true')
   parser.add_argument('--normalize', action='store_true')
-  parser.add_argument('--b-bias', type=float, default=1.25)
   parser.add_argument('--theta-star-std', type=float, default=0)
-  parser.add_argument('--theta-per-env', action='store_true')
-  parser.add_argument('--save-dataset', action='store_true')
   parser.add_argument('--rank-type', type=str, default='prediction', choices=('prediction', 'uniform'))
   parser.add_argument('--utility-dataset-std', type=float, default=2)
 
   # multienv
   parser.add_argument('--num-envs', default=1, type=int)
-  parser.add_argument('--pref',default='uniform',choices=['uniform', 'geometric'], type=str)
-  parser.add_argument('--prob', default=0.5, type=float)
-  parser.add_argument('--no-protocol', action='store_true')
   parser.add_argument('--envs-accept-rates', nargs='+', default=[1.00], type=float)
   parser.add_argument('--pref-vect', nargs='+', default=[1.00], type=float)
 
@@ -117,7 +109,7 @@ def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
   mean_sat_adv = 1000
 
   mean_gpa_disadv =  1.8
-  mean_gpa_adv = mean_gpa_disadv * args.b_bias
+  mean_gpa_adv = mean_gpa_disadv * 1.25
 
   # disadvantaged students
   b[disadv_idx,0] = np.random.normal(mean_sat_disadv,sigma_sat,b[disadv_idx][:,0].shape) #SAT
@@ -209,18 +201,14 @@ def distribute(n_rounds, theta, theta_scaled, deploy_sd_every):
     return theta_temp 
 
 def generate_theta(i, args, deploy_sd_every ):
-  if args.admit_all: # harris et. al settings. 
-    theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],args.num_applicants)
-    return theta 
-  else: # selection. in our settings, require theta to be repeating across a batch of students.
     assert args.num_applicants % args.applicants_per_round == 0
     n_rounds = int(args.num_applicants / args.applicants_per_round)
 
     if args.scaled_duplicates is None: # random vectors for every round
-      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],n_rounds)
+      theta = np.random.multivariate_normal([1,1+i],[[10, 0], [0, 1]],n_rounds)
 
     elif args.scaled_duplicates == 'sequence': # making sure there exists a scaled duplicate of each theta per round
-      theta = np.random.multivariate_normal([1,1+i*args.theta_per_env],[[10, 0], [0, 1]],int(n_rounds / 2))
+      theta = np.random.multivariate_normal([1,1+i],[[10, 0], [0, 1]],int(n_rounds / 2))
       assert theta.shape == (int(n_rounds/2), 2)
 
       # scaled duplicate of each theta. 
@@ -235,7 +223,7 @@ def generate_theta(i, args, deploy_sd_every ):
     assert theta.shape[0] == args.num_applicants
     return theta
 
-def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_conversion, args):
+def generate_data(num_applicants, applicants_per_round, fixed_effort_conversion, args):
   theta_star = np.zeros(shape=(args.num_envs, 2))
   theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
 
@@ -286,23 +274,20 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
   y_hat = y_hat_logits.sum(axis=-1)
 
-  def _get_selection(_y_hat, admit_all, n_rounds, accept_rate, rank_type):
-    if not admit_all:
-      _w = np.zeros_like(_y_hat)
-      # comparing applicants coming in the same rounds. 
-      for r in range(n_rounds):
-        _y_hat_r = _y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
+  def _get_selection(_y_hat, n_rounds, accept_rate, rank_type):
+    _w = np.zeros_like(_y_hat)
+    # comparing applicants coming in the same rounds. 
+    for r in range(n_rounds):
+      _y_hat_r = _y_hat[r * applicants_per_round: (r+1) * applicants_per_round]
   
-        w_r = get_selection(_y_hat_r, accept_rate, rank_type)
-        _w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
-    else:
-      _w = np.ones_like(y_hat)
+      w_r = get_selection(_y_hat_r, accept_rate, rank_type)
+      _w[r*applicants_per_round: (r+1)*applicants_per_round] = w_r
     return _w
 
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
     w[env_idx ] = _get_selection(
-      y_hat[env_idx], admit_all, n_rounds, args.envs_accept_rates[env_idx], args.rank_type
+      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type
       )
 
   z = np.zeros((args.num_applicants, ))
@@ -406,7 +391,7 @@ def our(x, y, theta, w):
 def run_multi_env(seed, args, env_idx=None):
     np.random.seed(seed)
     _, x, y, EW, theta, w, z, _, _, _, _, theta_star, pref_vect  = generate_data(
-    args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args
+    args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
     )
     
     assert args.num_envs == 1
