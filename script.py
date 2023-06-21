@@ -5,13 +5,13 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import pandas as pd
+import argparse
 # for notebook. 
 
 def get_git_revision_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 # %%
 def get_args(cmd):
-  import argparse
   parser = argparse.ArgumentParser()
 
   # dataset
@@ -29,6 +29,7 @@ def get_args(cmd):
   parser.add_argument('--theta-per-env', action='store_true')
   parser.add_argument('--save-dataset', action='store_true')
   parser.add_argument('--rank-type', type=str, default='prediction', choices=('prediction', 'uniform'))
+  parser.add_argument('--utility-dataset-std', type=float, default=2)
 
   # multienv
   parser.add_argument('--num-envs', default=1, type=int)
@@ -400,20 +401,26 @@ def our(x, y, theta, w):
 #%%
 def run_multi_env(seed, args, env_idx=None):
     np.random.seed(seed)
-    b, x, y, EW, theta, w, z, y_hat, adv_idx, disadv_idx, o, theta_star, pref_vect  = generate_data(
+    _, x, y, EW, theta, w, z, _, _, _, _, theta_star, pref_vect  = generate_data(
     args.num_applicants, args.admit_all, args.applicants_per_round, args.fixed_effort_conversion, args
     )
+    
+    assert args.num_envs == 1
+    y_utility, A, B = generate_data_utility(args, EW, theta, z, theta_star)
 
-    err_list = {}
+    err_list, est_list = {}, {}
     envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
     for env_idx in envs_itr:
-        dictenv = run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW)
-        for k, v in dictenv.items():
+        dictenv_err, dictenv_est = run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW, y_utility, A, B)
+        for k, v in dictenv_err.items():
             err_list[f'{k}_env{env_idx}'] = v
+        for k, v in dictenv_est.items():
+            est_list[f'{k}_env{env_idx}'] = v
     
-    return err_list, w, z
+    return err_list, w, z, est_list
 
-def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
+def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW, y_utility, A, B):
+    # extracting relevant variables for the environment i.
     y_env = y[env_idx].flatten() 
     theta_env = theta[env_idx]
     z_env = z==env_idx+1
@@ -422,7 +429,13 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
     if args.offline_eval:
       upp_limits = [args.num_applicants]
         
+    err_list, est_list = estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env, theta_env, z_env, upp_limits)    
+    # TODO: 
+    return err_list, est_list
+
+def estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env, theta_env, z_env, upp_limits):
     err_list = {m: [None] * len(upp_limits) for m in args.methods}
+    est_list = {m: [None] * len(upp_limits) for m in args.methods}
     for i, t in tqdm(enumerate(upp_limits)):
         x_round = x[:t]
         y_env_round = y_env[:t]
@@ -432,7 +445,6 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
         # filtering out rejected students
         y_env_round_selected = y_env_round[z_env_round]
         x_round_selected = x_round[z_env_round]
-        theta_env_round_selected = theta_env_round[z_env_round]
         theta_round_selected = theta[:, :t][:, z_env_round]
         assert theta_round_selected.shape == (args.num_envs, z_env_round.sum(), 2)
 
@@ -449,7 +461,42 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW):
             
             assert theta_star[env_idx].shape == est.shape, f"{theta[0].shape}, {est.shape}"
             err_list[m][i] = np.linalg.norm(theta_star[env_idx] - est )
-    return err_list
+            est_list[m][i] = est
+    return err_list, est_list
+
+def generate_data_utility(args: argparse.Namespace, EET: np.ndarray, theta: np.ndarray, z: np.ndarray, theta_star: np.ndarray):
+    """
+    Generate data according for utility.
+    
+    Args:
+    EET: np.array, shape = (2,2). 
+    theta: np.array, shape = (num_envs, num_applicants, 2)
+    z: np.array, shape = (num_applicants, )
+    theta_star: np.array, shape = (num_envs, 2)
+    
+    Returns:
+    y, np.array, shape = (n_rounds, applicants_per_round). y_supportive_protocol[i] contains the output of
+      accepted applicants, np.nan is left elsewhere.
+    A: np.array, shape = (2, )
+    B: float
+    """
+    assert args.num_envs == 1, f"so far only implemented for a single environment"
+    env_idx = 0
+    theta_unique_env = theta[env_idx, 0::args.applicants_per_round] # (n_rounds, 2) 
+    assert theta_unique_env.ndim == 2
+    n_rounds = theta_unique_env.shape[env_idx]
+
+    A = np.array([1, 2])
+    B = 1.99 
+    y_utility = np.ones(shape=(n_rounds, args.applicants_per_round)) * np.nan
+    for i, th in enumerate(theta_unique_env):
+        # number of accepted students at uni, same as in cooperative protocol.
+        n_samples = (z[i*args.applicants_per_round: (i*args.applicants_per_round) + args.applicants_per_round] == env_idx+1).sum ()     
+        base = A.dot(th) + B + np.random.normal(loc=0, scale=args.utility_dataset_std, size=(n_samples,))
+        impr = th.dot((EET).dot(theta_star[env_idx]))
+    
+        y_utility[i, :n_samples] = base + impr
+    return y_utility, A, B
 
 # convert to dataframe.
 def runs2df(runs):
