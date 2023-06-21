@@ -472,14 +472,14 @@ def generate_data_utility(args: argparse.Namespace, EET: np.ndarray, theta: np.n
     """
     assert args.num_envs == 1, f"so far only implemented for a single environment"
     env_idx = 0
-    theta_unique_env = theta[env_idx, 0::args.applicants_per_round] # (n_rounds, 2) 
-    assert theta_unique_env.ndim == 2
-    n_rounds = theta_unique_env.shape[env_idx]
+    theta_rounds_env = theta[env_idx, 0::args.applicants_per_round] # (n_rounds, 2) 
+    assert theta_rounds_env.ndim == 2
+    n_rounds = theta_rounds_env.shape[0]
 
     A = np.array([1, 2])
     B = 1.99 
     y_utility = np.ones(shape=(n_rounds, args.applicants_per_round)) * np.nan
-    for i, th in enumerate(theta_unique_env):
+    for i, th in enumerate(theta_rounds_env):
         # number of accepted students at uni, same as in cooperative protocol.
         n_samples = (z[i*args.applicants_per_round: (i*args.applicants_per_round) + args.applicants_per_round] == env_idx+1).sum ()     
         base = A.dot(th) + B + np.random.normal(loc=0, scale=args.utility_dataset_std, size=(n_samples,))
