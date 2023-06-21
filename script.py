@@ -83,7 +83,7 @@ def normalize(arrs, new_min, new_max):
     out.append(
       (((arr - curr_min) / curr_range) * new_range) + new_min
     )
-  return out
+  return out, new_range / curr_range
 
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
   assert adv_idx.max() < n_samples
@@ -256,13 +256,17 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
   # observable features x
   x = compute_xt(EWi, b, theta, args.pref_vect, args)
 
+  EET = EW.dot(EW.T)
   # normalize
   if args.normalize:
-    (b[:, 0], x[:, 0]) = normalize((b[:, 0], x[:, 0]), new_min=400, new_max=1600)
-    (b[:, 1], x[:, 1]) = normalize((b[:, 1], x[:, 1]), new_min=0, new_max=4)
+    (b[:, 0], x[:, 0]), scale1 = normalize((b[:, 0], x[:, 0]), new_min=400, new_max=1600)
+    (b[:, 1], x[:, 1]), scale2= normalize((b[:, 1], x[:, 1]), new_min=0, new_max=4)
+    
+    # scale EET accordingly.
+    EET = np.matmul(np.array([[scale1, 0], [0, scale2]]), EET)
+
 
   # true outcomes (college gpa)
-  # y = np.clip() # clipped outcomes
   assert x[np.newaxis].shape == (1, args.num_applicants, 2)
   assert theta.shape == (args.num_envs, args.num_applicants, 2)
   assert g.shape == (args.num_applicants, args.num_envs)
@@ -311,7 +315,7 @@ def generate_data(num_applicants, admit_all, applicants_per_round, fixed_effort_
       temp = np.random.multinomial(n=1, pvals=pvals, size=1)
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx+1 # offset to avoid conflict with "no uni" decision
-  return b,x,y,EW,theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
+  return b,x,y,EET,theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
 
 # %%
 def ols(x,y):
@@ -447,6 +451,7 @@ def estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env
         x_round_selected = x_round[z_env_round]
         theta_round_selected = theta[:, :t][:, z_env_round]
         assert theta_round_selected.shape == (args.num_envs, z_env_round.sum(), 2)
+
 
         for m in args.methods:
             if m == 'ours':
