@@ -1,8 +1,11 @@
 # %%
+import argparse
+from typing import Tuple, List
+
 import numpy as np
 
 
-def normalize(arrs, new_min, new_max):
+def normalize(arrs: list, new_min: float, new_max: float) -> Tuple[List[float], float]:
   new_range = new_max - new_min
   curr_min = np.concatenate(arrs).min()
   curr_max = np.concatenate(arrs).max()
@@ -54,7 +57,7 @@ def distribute(n_rounds, theta, theta_scaled, deploy_sd_every):
   return theta_temp
 
 
-def generate_theta(i, args, deploy_sd_every):
+def generate_theta(i: int, args: argparse.Namespace, deploy_sd_every: int) -> np.ndarray:
   assert args.num_applicants % args.applicants_per_round == 0
   n_rounds = int(args.num_applicants / args.applicants_per_round)
 
@@ -78,8 +81,10 @@ def generate_theta(i, args, deploy_sd_every):
   return theta
 
 
-def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
+def generate_bt(n_samples: int, sigma_sat: float, sigma_gpa: float, args: argparse.Namespace) \
+    -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
   assert n_samples % 2 == 0, f"{n_samples} not divisible by 2"
+
   half = int(n_samples / 2)
   b = np.zeros([n_samples, 2])
 
@@ -114,7 +119,8 @@ def generate_bt(n_samples, sigma_sat, sigma_gpa, args):
   return b, g, adv_idx, disadv_idx
 
 
-def compute_xt(EWi, b, theta, pref_vect, args):
+def compute_xt(EWi: np.ndarray, b: np.ndarray, theta: np.ndarray, pref_vect: np.ndarray,
+               args: argparse.Namespace) -> np.ndarray:
   assert EWi.shape[0] == b.shape[0]
   assert b.shape[0] == theta.shape[1]
 
@@ -156,7 +162,7 @@ def get_selection(y_hat, accept_rate, rank_type):
   return w_test
 
 
-def generate_thetas(args):
+def generate_thetas(args: argparse.Namespace) -> np.ndarray:
   deploy_sd_every = 2
   thetas = []
   for i in range(args.num_envs):
@@ -171,7 +177,10 @@ def generate_thetas(args):
 
 
 # for notebook.
-def generate_data(num_applicants, applicants_per_round, fixed_effort_conversion, args):
+def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
+                  args: argparse.Namespace) \
+    -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+             np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
   theta_star = np.zeros(shape=(args.num_envs, 2))
   theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
 
