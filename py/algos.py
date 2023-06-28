@@ -1,6 +1,7 @@
 # %%
 import argparse
 import subprocess
+import py.data_gen as data_gen
 
 import numpy as np
 import pandas as pd
@@ -165,7 +166,7 @@ def our(x, y, theta, w):
 # %%
 def run_multi_env(seed, args, env_idx=None):
   np.random.seed(seed)
-  _, x, y, EW, theta, w, z, _, _, _, _, theta_star, pref_vect = generate_data(
+  _, x, y, EW, theta, w, z, _, _, _, _, theta_star, pref_vect = data_gen.generate_data(
     args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
   )
 
