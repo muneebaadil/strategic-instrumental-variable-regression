@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Usage: rundock.sh <dir-containing-docker-file> ["int"]
+# Usage: rundock.sh <dir-containing-docker-file> ["int"|"nb"]
 
 # User's params
 IMG_TAG="csl"
@@ -13,8 +13,7 @@ set -e
 # process params
 context=$(readlink -f -- "$1")
 host_dir="${context}/$HOST_DIR_NAME"
-interactive_mode=0
-if [[ $2 = "int" ]]; then interactive_mode=1; fi
+launch_mode=$2
 
 # build
 echo "---------------------------------"
@@ -27,8 +26,10 @@ echo "---------------------------------"
 echo "Binding: ${host_dir} and ${VIRTUAL_DIR}"
 echo "---------------------------------"
 
-if [[ $interactive_mode = 1 ]]; then
-  docker run -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} /bin/bash
+if [[ $launch_mode = "int" ]]; then
+  docker run --rm -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} /bin/bash
+elif [[ $launch_mode = "nb" ]]; then
+  docker run --rm -p 8888:8888 ${IMG_TAG} /bin/bash -c "jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"
 else
-  docker run -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} python py/main.py
+  docker run --rm -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} python py/main.py
 fi
