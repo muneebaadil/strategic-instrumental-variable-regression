@@ -394,8 +394,10 @@ def run_multi_env(seed, args, env_idx=None):
     args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
     )
     
-    assert args.num_envs == 1
-    y_utility, A, B = generate_data_utility(args, EW, theta, z, theta_star)
+    if args.num_envs == 1:
+      y_utility, A, B = generate_data_utility(args, EW, theta, z, theta_star)
+    else:
+       y_utility, A, B = None, None, None
 
     err_list, est_list = {}, {}
     envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
@@ -452,7 +454,11 @@ def estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env
             assert theta_star[env_idx].shape == est.shape, f"{theta[0].shape}, {est.shape}"
             err_list[m][i] = np.linalg.norm(theta_star[env_idx] - est )
             est_list[m][i] = est
-    return err_list, est_list
+
+    # # estimate EET.
+    # model = LinearRegression()
+    # model.fit(theta_env, x)
+    return err_list, est_list# , model.coef_.T
 
 def generate_data_utility(args: argparse.Namespace, EET: np.ndarray, theta: np.ndarray, z: np.ndarray, theta_star: np.ndarray):
     """
