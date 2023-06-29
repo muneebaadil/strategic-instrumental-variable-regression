@@ -7,5 +7,7 @@ COPY requirements.4dock ./
 RUN pip install -r requirements.4dock
 
 COPY py ./py
-COPY *.py ./
+COPY pytest ./pytest
 COPY experiments.ipynb ./
+
+ENV PYTHONPATH=.

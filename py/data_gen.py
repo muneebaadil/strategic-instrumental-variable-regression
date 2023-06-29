@@ -4,6 +4,10 @@ from typing import Tuple, List
 
 import numpy as np
 
+from py.agents_gen import gen_base_agents, gen_covariates, gen_outcomes, \
+  compute_percentile_admissions, compute_random_admissions, realise_enrollments
+from py.decisions import ThetaGenerator
+
 
 def normalize(arrs: list, new_min: float, new_max: float) -> Tuple[List[float], float]:
   new_range = new_max - new_min
@@ -118,6 +122,7 @@ def generate_bt(n_samples: int, sigma_sat: float, sigma_gpa: float, args: argpar
   g += np.random.normal(1, 0.2, size=(args.num_applicants, args.num_envs))  # non-zero-mean
   return b, g, adv_idx, disadv_idx
 
+
 def compute_xt(EWi: np.ndarray, b: np.ndarray, theta: np.ndarray, pref_vect: np.ndarray,
                args: argparse.Namespace) -> np.ndarray:
   assert EWi.shape[0] == b.shape[0]
@@ -148,6 +153,7 @@ def _get_selection(_y_hat, n_rounds, accept_rate, rank_type, applicants_per_roun
     w_r = get_selection(_y_hat_r, accept_rate, rank_type)
     _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
   return _w
+
 
 def get_selection(y_hat, accept_rate, rank_type):
   if rank_type == 'prediction':
@@ -248,7 +254,8 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
     w[env_idx] = _get_selection(
-      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type, args.applicants_per_round
+      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type,
+      args.applicants_per_round
     )
 
   z = np.zeros((args.num_applicants,))
@@ -262,3 +269,104 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx + 1  # offset to avoid conflict with "no uni" decision
   return b, x, y, EET, theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
+
+
+def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
+                     args: argparse.Namespace, _theta: np.ndarray = None) \
+    -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+             np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+  theta_star = np.zeros(shape=(args.num_envs, 2))
+  theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
+
+  u, b_tr, e = gen_base_agents(num_applicants, fixed_effort_conversion)
+  if args.clip:
+    b_tr[:, 0] = np.clip(b_tr[:, 0], 400, 1600)  # clip to 400 to 1600
+    b_tr[:, 1] = np.clip(b_tr[:, 1], 0, 4)  # clip to 0 to 4.0
+
+  assert num_applicants % applicants_per_round == 0
+  n_rounds = int(num_applicants / applicants_per_round)
+
+  # assessment rule
+  if _theta is None:  # distribute randomly.
+    thegen = ThetaGenerator(length=n_rounds, num_principals=args.num_envs)
+    if args.scaled_duplicates is None:
+      theta = thegen.generate_randomly()
+    elif args.scaled_duplicates == 'sequence':
+      theta = thegen.generate_general_coop_case(num_cooperative_principals=args.num_cooperative_envs)
+    else:
+      raise ValueError(args.scaled_duplicates)
+    theta = (
+      ThetaGenerator.intra_round_repeat(thetas_tr=theta, repeats=args.applicants_per_round)
+        .transpose((1, 0, 2))
+    )  # (n,T,m)
+  else:  # set as given
+    assert _theta.shape == (args.num_envs, 2)
+    theta = np.copy(_theta)
+    theta = theta[:, np.newaxis]
+    theta = np.repeat(theta, repeats=num_applicants, axis=1)
+
+  # observable features x
+  avg_theta_tr = np.matmul(np.transpose(theta, axes=(1, -1, 0)), args.pref_vect)
+  x_tr = gen_covariates(b_tr=b_tr, e=e, avg_theta_tr=avg_theta_tr)
+  if args.clip:
+    x_tr[:, 0] = np.clip(x_tr[:, 0], 400, 1600)  # clip to 400 to 1600
+    x_tr[:, 1] = np.clip(x_tr[:, 1], 0, 4)  # clip to 0 to 4.0
+
+  EW = e.mean(axis=0)
+  EET = EW.dot(EW.T)
+  # normalize
+  if args.normalize:
+    (b_tr[:, 0], x_tr[:, 0]), scale1 = normalize([b_tr[:, 0], x_tr[:, 0]], new_min=400, new_max=1600)
+    (b_tr[:, 1], x_tr[:, 1]), scale2 = normalize([b_tr[:, 1], x_tr[:, 1]], new_min=0, new_max=4)
+
+    # scale EET accordingly.
+    EET = np.matmul(np.array([[scale1, 0], [0, scale2]]), EET)
+
+  # true outcomes (college gpa)
+  o, y = gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_star)
+  y = y.T
+  if args.clip:
+    y = np.clip(y, 0, 4)
+
+  assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
+  assert theta.shape == (args.num_envs, args.num_applicants, 2)
+  assert o.shape == (args.num_applicants, args.num_envs)
+  assert theta_star.shape == (args.num_envs, 2)
+
+  # our setup addition
+  # computing admission results.
+  x_norm = (x_tr - x_tr.mean(axis=0, keepdims=True)) / x_tr.std(axis=0, keepdims=True)
+  x_norm = x_norm[np.newaxis]
+  y_hat_logits = (x_norm * theta)
+  # y_hat_logits = y_hat_logits - y_hat_logits.mean(axis=1, keepdims=True)
+  # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
+  y_hat = y_hat_logits.sum(axis=-1)
+
+  def _get_selection(_y_hat, n_rounds, accept_rate, rank_type):
+    _w = np.zeros_like(_y_hat)
+    # comparing applicants coming in the same rounds.
+    for r in range(n_rounds):
+      _y_hat_r = _y_hat[r * applicants_per_round: (r + 1) * applicants_per_round]
+
+      if rank_type == 'prediction':
+        w_r = compute_percentile_admissions(y_hat=_y_hat_r, p=accept_rate)
+      elif rank_type == 'uniform':
+        w_r = compute_random_admissions(length=len(_y_hat_r), p=accept_rate)
+      else:
+        raise ValueError(rank_type)
+      _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
+    return _w
+
+  w = np.zeros((args.num_envs, num_applicants))
+  for env_idx in range(args.num_envs):
+    w[env_idx] = _get_selection(
+      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type
+    )
+
+  z = realise_enrollments(w_tr=w.T, gammas_tr=np.tile(args.pref_vect, reps=(num_applicants, 1)))
+
+  # for backwards compatibility
+  adv_idx = np.where(u is True)
+  disadv_idx = np.where(u is False)
+
+  return b_tr, x_tr, y, EET, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect
