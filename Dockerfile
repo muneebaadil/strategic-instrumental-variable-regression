@@ -8,3 +8,4 @@ RUN pip install -r requirements.4dock
 
 COPY py ./py
 COPY *.py ./
+COPY experiments.ipynb ./
