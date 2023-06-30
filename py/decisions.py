@@ -1,5 +1,7 @@
 import numpy as np
 
+from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents
+
 
 class ThetaGenerator:
   def __init__(self, length: int, num_principals: int):
@@ -108,21 +110,81 @@ class ThetaGenerator:
   @staticmethod
   def intra_round_repeat(thetas_tr: np.ndarray, repeats: int) -> np.ndarray:
     """
+    When each round has 's' agents arriving.
     Args:
       thetas_tr (np.ndarray): a (T,n,m) tensor of thetas.
-      repeats (int):
+      repeats (int): e.g., repeat 's' times within each round.
 
     Returns:
-      np.ndarray: a (T,n,m) tensor of thetas.
+      np.ndarray: a (Txs,n,m) tensor of thetas.
     """
     return np.repeat(thetas_tr, repeats=repeats, axis=0)
 
 
 class Simulator:
-  def __init__(self):
+  def __init__(self, num_agents: int, has_same_effort: bool, does_clip: bool, does_normalise: bool):
+    self._num_agents = num_agents  # per round
+    self._has_same_effort = has_same_effort
+    self._does_clip = does_clip
+    self._does_normalise = does_normalise
+
+    self.u = None
+    self.b_tr = None
+    self.thetas_tr = None
+    self.x_tr = None
+    self.eet_mean = None
     return
 
-  def deploy(self, thetas_tr: np.ndarray):
+  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray):
+    """
+    Args:
+      thetas_tr (np.ndarray): a (T,n,m) matrix of thetas.
+      gammas (np.ndarray): a (n,) vector of gammas.
+
+    Returns:
+
+    """
+    # check the dimensions
+    T, n, m = thetas_tr.shape
+    assert n == gammas.shape[0]
+
+    # init params
+    s = self._num_agents
+    has_same_effort = self._has_same_effort
+    does_clip = self._does_clip
+    does_normalise = self._does_normalise
+
+    # agents are spawned
+    u, b_tr, e = gen_base_agents(length=(T * s), has_same_effort=has_same_effort)
+    b_tr = clip_covariates(b_tr) if does_clip else b_tr
+
+    # compute average thetas
+    # (n,) and (n,T,m) -> (T,m)
+    avg_theta_tr = (gammas.reshape((n, 1, 1)) * thetas_tr.transpose((1, 0, 2))).sum(axis=0)
+
+    # release thetas & average thetas
+    thetas_tr = ThetaGenerator.intra_round_repeat(thetas_tr=thetas_tr, repeats=s)  # (Txs,n,m)
+    avg_theta_tr = ThetaGenerator.intra_round_repeat(thetas_tr=avg_theta_tr, repeats=s)  # (Txs,m)
+
+    # agents take strategic actions
+    x_tr = gen_covariates(b_tr=b_tr, e=e, avg_theta_tr=avg_theta_tr)
+    x_tr = clip_covariates(x_tr) if does_clip else x_tr
+
+    # normalise agents' data
+    e_mean = e.mean(axis=0)
+    eet_mean = e_mean.dot(e_mean.T)
+    if does_normalise:
+      b_tr, x_tr, eet_mean = normalise_agents(b_tr=b_tr, x_tr=x_tr, eet_mean=eet_mean)
+
+    # TODO: add admissions and enrollments
+
+    # assignment
+    self.u = u  # TODO: to be removed
+    self.b_tr = b_tr
+    self.thetas_tr = thetas_tr  # TODO: to be removed
+    self.x_tr = x_tr
+    self.eet_mean = eet_mean
+
     return
 
   def enroll(self, theta_stars_tr: np.ndarray):

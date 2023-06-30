@@ -6,22 +6,8 @@ import numpy as np
 
 from py.agents_gen import gen_base_agents, gen_covariates, gen_outcomes, \
   compute_percentile_admissions, compute_random_admissions, realise_enrollments
-from py.decisions import ThetaGenerator
-
-
-def normalize(arrs: list, new_min: float, new_max: float) -> Tuple[List[float], float]:
-  new_range = new_max - new_min
-  curr_min = np.concatenate(arrs).min()
-  curr_max = np.concatenate(arrs).max()
-
-  curr_range = curr_max - curr_min
-
-  out = []
-  for arr in arrs:
-    out.append(
-      (((arr - curr_min) / curr_range) * new_range) + new_min
-    )
-  return out, new_range / curr_range
+from py.decisions import ThetaGenerator, Simulator
+from py.utils import normalize
 
 
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
@@ -190,6 +176,7 @@ def generate_thetas(args: argparse.Namespace) -> np.ndarray:
   thetas = np.stack(thetas)
   return thetas
 
+
 # for notebook.
 def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
                   args: argparse.Namespace, _theta=None, ) \
@@ -278,11 +265,6 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   theta_star = np.zeros(shape=(args.num_envs, 2))
   theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
 
-  u, b_tr, e = gen_base_agents(num_applicants, fixed_effort_conversion)
-  if args.clip:
-    b_tr[:, 0] = np.clip(b_tr[:, 0], 400, 1600)  # clip to 400 to 1600
-    b_tr[:, 1] = np.clip(b_tr[:, 1], 0, 4)  # clip to 0 to 4.0
-
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
 
@@ -295,38 +277,24 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
       theta = thegen.generate_general_coop_case(num_cooperative_principals=args.num_cooperative_envs)
     else:
       raise ValueError(args.scaled_duplicates)
-    theta = (
-      ThetaGenerator.intra_round_repeat(thetas_tr=theta, repeats=args.applicants_per_round)
-        .transpose((1, 0, 2))
-    )  # (n,T,m)
   else:  # set as given
-    assert _theta.shape == (args.num_envs, 2)
-    theta = np.copy(_theta)
-    theta = theta[:, np.newaxis]
-    theta = np.repeat(theta, repeats=num_applicants, axis=1)
+    raise NotImplementedError("Use Simulator instead!")
 
-  # observable features x
-  avg_theta_tr = np.matmul(np.transpose(theta, axes=(1, -1, 0)), args.pref_vect)
-  x_tr = gen_covariates(b_tr=b_tr, e=e, avg_theta_tr=avg_theta_tr)
-  if args.clip:
-    x_tr[:, 0] = np.clip(x_tr[:, 0], 400, 1600)  # clip to 400 to 1600
-    x_tr[:, 1] = np.clip(x_tr[:, 1], 0, 4)  # clip to 0 to 4.0
-
-  EW = e.mean(axis=0)
-  EET = EW.dot(EW.T)
-  # normalize
-  if args.normalize:
-    (b_tr[:, 0], x_tr[:, 0]), scale1 = normalize([b_tr[:, 0], x_tr[:, 0]], new_min=400, new_max=1600)
-    (b_tr[:, 1], x_tr[:, 1]), scale2 = normalize([b_tr[:, 1], x_tr[:, 1]], new_min=0, new_max=4)
-
-    # scale EET accordingly.
-    EET = np.matmul(np.array([[scale1, 0], [0, scale2]]), EET)
+  sim = Simulator(
+    num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
+    does_clip=args.clip, does_normalise=args.normalize
+  )
+  sim.deploy(thetas_tr=theta,gammas=args.pref_vect)
+  u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
 
   # true outcomes (college gpa)
   o, y = gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_star)
   y = y.T
   if args.clip:
     y = np.clip(y, 0, 4)
+
+  # for backwards compatibility
+  theta = theta.transpose((1,0,2))
 
   assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
   assert theta.shape == (args.num_envs, args.num_applicants, 2)
@@ -369,4 +337,4 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   adv_idx = np.where(u is True)
   disadv_idx = np.where(u is False)
 
-  return b_tr, x_tr, y, EET, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect
+  return b_tr, x_tr, y, eet_mean, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect

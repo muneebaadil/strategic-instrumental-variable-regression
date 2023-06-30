@@ -2,12 +2,59 @@
 To generate data for agents.
 Might be coupled with environments/decision makers:
 - In generating noise.
+- In 'not' generating gammas alongside base agents.
 """
 
+import copy
 from typing import Tuple
 
 import numpy as np
-from sklearn.preprocessing import normalize
+from sklearn.preprocessing import normalize as skl_normalize
+
+from py.utils import normalize
+
+
+def clip_covariates(x_tr: np.ndarray) -> np.ndarray:
+  """
+  This works for both base covariates (i.e., b) and improved covariates (i.e., X).
+
+  Args:
+    x_tr (np.ndarray): a (T,m) matrix of covariates.
+
+  Returns:
+    np.ndarray: a (T,m) matrix of clipped covariates.
+  """
+  x_tr = copy.deepcopy(x_tr)
+  x_tr[:, 0] = np.clip(x_tr[:, 0], 400, 1600)  # clip to 400 to 1600
+  x_tr[:, 1] = np.clip(x_tr[:, 1], 0, 4)  # clip to 0 to 4.0
+  return x_tr
+
+
+def normalise_agents(b_tr: np.ndarray, x_tr: np.ndarray, eet_mean: np.ndarray) \
+    -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+  """
+  Args:
+    b_tr (np.ndarray): a (T,2) matrix of base covariates.
+    x_tr (np.ndarray): a (T,2) matrix of covariates.
+    eet_mean (np.ndarray): a (2,2) matrix of the 'mean' of effort.
+  Returns:
+    Tuple[np.ndarray,np.ndarray,np.ndarray]: two (T,2) matrices and one (2,2) matrix.
+  """
+
+  # start here
+  b_tr = copy.deepcopy(b_tr)
+  x_tr = copy.deepcopy(x_tr)
+  (b_tr[:, 0], x_tr[:, 0]), scale1 = normalize([b_tr[:, 0], x_tr[:, 0]], new_min=400, new_max=1600)
+  (b_tr[:, 1], x_tr[:, 1]), scale2 = normalize([b_tr[:, 1], x_tr[:, 1]], new_min=0, new_max=4)
+
+  # scale EET accordingly.
+  eet_mean = np.matmul(np.array([[scale1, 0], [0, scale2]]), eet_mean)
+
+  return b_tr, x_tr, eet_mean
+
+
+def clip_outcomes(y: np.ndarray):
+  return np.clip(y, 0, 4)  # GPA
 
 
 def gen_base_agents(length: int, has_same_effort: bool) \
@@ -144,9 +191,9 @@ def realise_enrollments(w_tr: np.ndarray, gammas_tr: np.ndarray) -> np.ndarray:
 
   # check the dimensions
   T, n = w_tr.shape
-  assert T, n == gammas_tr.shape[0]
+  assert (T, n) == gammas_tr.shape
 
-  probs_tr = normalize(w_tr * gammas_tr, axis=1, norm='l1')  # auto handles the zero case.
+  probs_tr = skl_normalize(w_tr * gammas_tr, axis=1, norm='l1')  # auto handles the zero case.
 
   z = np.zeros(T)
   for i in range(T):
