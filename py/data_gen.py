@@ -118,7 +118,6 @@ def generate_bt(n_samples: int, sigma_sat: float, sigma_gpa: float, args: argpar
   g += np.random.normal(1, 0.2, size=(args.num_applicants, args.num_envs))  # non-zero-mean
   return b, g, adv_idx, disadv_idx
 
-
 def compute_xt(EWi: np.ndarray, b: np.ndarray, theta: np.ndarray, pref_vect: np.ndarray,
                args: argparse.Namespace) -> np.ndarray:
   assert EWi.shape[0] == b.shape[0]
@@ -139,6 +138,16 @@ def compute_xt(EWi: np.ndarray, b: np.ndarray, theta: np.ndarray, pref_vect: np.
     x[:, 1] = np.clip(x[:, 1], 0, 4)  # clip to 0 to 4.0
   return x
 
+
+def _get_selection(_y_hat, n_rounds, accept_rate, rank_type, applicants_per_round):
+  _w = np.zeros_like(_y_hat)
+  # comparing applicants coming in the same rounds.
+  for r in range(n_rounds):
+    _y_hat_r = _y_hat[r * applicants_per_round: (r + 1) * applicants_per_round]
+
+    w_r = get_selection(_y_hat_r, accept_rate, rank_type)
+    _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
+  return _w
 
 def get_selection(y_hat, accept_rate, rank_type):
   if rank_type == 'prediction':
@@ -175,12 +184,14 @@ def generate_thetas(args: argparse.Namespace) -> np.ndarray:
   thetas = np.stack(thetas)
   return thetas
 
-
 # for notebook.
 def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
-                  args: argparse.Namespace) \
-    -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+                  args: argparse.Namespace, _theta=None, ) \
+-> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
              np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+  assert num_applicants % applicants_per_round == 0
+  n_rounds = int(num_applicants / applicants_per_round)
+
   theta_star = np.zeros(shape=(args.num_envs, 2))
   theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
 
@@ -190,9 +201,13 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   b, g, adv_idx, disadv_idx = generate_bt(num_applicants, sigma_sat, sigma_gpa, args)
 
   # assessment rule
-  theta = generate_thetas(args)
-  assert num_applicants % applicants_per_round == 0
-  n_rounds = int(num_applicants / applicants_per_round)
+  if _theta is None: # distribute randomly.
+    theta = generate_thetas(args)
+  else: # set as given
+    assert _theta.shape == (args.num_envs, 2)
+    theta = np.copy(_theta)
+    theta = theta[:, np.newaxis]
+    theta = np.repeat(theta, repeats=num_applicants, axis=1)
 
   # effort conversion matrices
   EW = np.array([[10.0, 0], [0, 1.0]])
@@ -230,20 +245,10 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
   y_hat = y_hat_logits.sum(axis=-1)
 
-  def _get_selection(_y_hat, n_rounds, accept_rate, rank_type):
-    _w = np.zeros_like(_y_hat)
-    # comparing applicants coming in the same rounds.
-    for r in range(n_rounds):
-      _y_hat_r = _y_hat[r * applicants_per_round: (r + 1) * applicants_per_round]
-
-      w_r = get_selection(_y_hat_r, accept_rate, rank_type)
-      _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
-    return _w
-
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
     w[env_idx] = _get_selection(
-      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type
+      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type, args.applicants_per_round
     )
 
   z = np.zeros((args.num_applicants,))
