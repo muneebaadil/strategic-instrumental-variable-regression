@@ -1,6 +1,8 @@
 import numpy as np
 
-from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents
+from py.agents_gen import clip_outcomes
+from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents, \
+  gen_outcomes
 
 
 class ThetaGenerator:
@@ -28,7 +30,6 @@ class ThetaGenerator:
     Args:
       deploy_sd_every (int):
       mean_shift (int):
-
     Returns:
       np.ndarray: a (T,n,m) tensor of thetas
     """
@@ -72,15 +73,13 @@ class ThetaGenerator:
 
     return np.stack(thetas_tr).transpose((1, 0, 2))  # (T,n,m)
 
-  def generate_general_coop_case(self, num_cooperative_principals: int):
+  def generate_general_coop_case(self, num_cooperative_principals: int) -> np.ndarray:
     """
     When only a subset of principals follows the cooperative protocol.
-
     Args:
       num_cooperative_principals (int):
-
     Returns:
-
+      np.ndarray
     """
     T = self._T
     n = self._n
@@ -114,7 +113,6 @@ class ThetaGenerator:
     Args:
       thetas_tr (np.ndarray): a (T,n,m) tensor of thetas.
       repeats (int): e.g., repeat 's' times within each round.
-
     Returns:
       np.ndarray: a (Txs,n,m) tensor of thetas.
     """
@@ -133,16 +131,19 @@ class Simulator:
     self.thetas_tr = None
     self.x_tr = None
     self.eet_mean = None
+
+    self.o = None
+    self.y = None
+
     return
 
-  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray):
+  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray) -> None:
     """
     Args:
       thetas_tr (np.ndarray): a (T,n,m) matrix of thetas.
       gammas (np.ndarray): a (n,) vector of gammas.
-
     Returns:
-
+      None
     """
     # check the dimensions
     T, n, m = thetas_tr.shape
@@ -177,6 +178,7 @@ class Simulator:
       b_tr, x_tr, eet_mean = normalise_agents(b_tr=b_tr, x_tr=x_tr, eet_mean=eet_mean)
 
     # TODO: add admissions and enrollments
+    # y_hat goes here
 
     # assignment
     self.u = u  # TODO: to be removed
@@ -187,5 +189,25 @@ class Simulator:
 
     return
 
-  def enroll(self, theta_stars_tr: np.ndarray):
+  def enroll(self, theta_stars_tr: np.ndarray) -> None:
+    """
+    Counterfactually/Potentially enroll agents into environments and get their outcomes.
+    Args:
+      theta_stars_tr (np.ndarray): a (n,m) matrix of 'n' theta_stars.
+    Returns:
+      None
+    """
+    # init params
+    u = self.u
+    x_tr = self.x_tr
+    does_clip = self._does_clip
+
+    # start here
+    o, y = gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_stars_tr)
+    y = clip_outcomes(y) if does_clip else y
+
+    # assignment
+    self.o = o
+    self.y = y
+
     return

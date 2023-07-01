@@ -288,13 +288,12 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
 
   # true outcomes (college gpa)
-  o, y = gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_star)
-  y = y.T
-  if args.clip:
-    y = np.clip(y, 0, 4)
+  sim.enroll(theta_stars_tr=theta_star)
+  o, y = sim.o, sim.y
 
   # for backwards compatibility
   theta = theta.transpose((1,0,2))
+  y = y.T
 
   assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
   assert theta.shape == (args.num_envs, args.num_applicants, 2)
