@@ -125,6 +125,39 @@ class DataGenTest(unittest.TestCase):
     np.testing.assert_allclose(data_v2[idx].var(), data_v1[idx].var(), rtol=0.06)
     np.testing.assert_allclose(data_v2[idx].var(), 25, rtol=0.06)
 
+    # test the means, E[b|z=1]
+    b_idx = 0
+    z_idx = 6
+    rtol = 0.06
+    b2 = data_v2[b_idx][data_v2[z_idx] == 1].mean(axis=0)
+    b1 = data_v1[b_idx][data_v1[z_idx] == 1].mean(axis=0)
+    np.testing.assert_allclose(b2, b1, rtol=rtol)
+    np.testing.assert_allclose(b2, [900, 2.025], rtol=rtol)
+    self.assertRaises(
+      AssertionError,
+      np.testing.assert_allclose, actual=b1, desired=[1000, 2.25], rtol=rtol
+    )
+
+    # test the distribution p(z)
+    z_idx = 6
+    rtol = 0.02
+    z2 = data_v2[z_idx]
+    z1 = data_v1[z_idx]
+
+    np.testing.assert_allclose(z2.mean(), z1.mean(), rtol=rtol)
+    np.testing.assert_allclose(z2.mean(), 25, rtol=rtol)
+    self.assertRaises(
+      AssertionError,
+      np.testing.assert_allclose, actual=z2.mean(), desired=30, rtol=rtol
+    )
+
+    np.testing.assert_allclose(z2.var(), z1.var(), rtol=rtol)
+    np.testing.assert_allclose(z2.var(), 203, rtol=rtol)
+    self.assertRaises(
+      AssertionError,
+      np.testing.assert_allclose, actual=z2.var(), desired=210, rtol=rtol
+    )
+
     return
 
 

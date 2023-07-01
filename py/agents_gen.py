@@ -225,6 +225,6 @@ def realise_enrollments(w_tr: np.ndarray, gammas_tr: np.ndarray) -> np.ndarray:
   for i in range(T):
     p = probs_tr[i]
     if p.sum() > 0:  # only for agents with at least 1 admission offer.
-      z = np.random.choice(n, p=p) + 1  # offset to avoid conflict with "no uni" decision
+      z[i] = np.random.choice(n, p=p) + 1  # offset to avoid conflict with "no uni" decision
 
   return z

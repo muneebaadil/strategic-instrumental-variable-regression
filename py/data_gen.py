@@ -285,7 +285,7 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
     does_clip=args.clip, does_normalise=args.normalize,
     ranking_type=args.rank_type
   )
-  sim.deploy(thetas_tr=theta,gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
+  sim.deploy(thetas_tr=theta, gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
   u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
 
   # true outcomes (college gpa)
