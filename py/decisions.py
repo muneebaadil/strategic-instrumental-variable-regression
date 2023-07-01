@@ -1,6 +1,8 @@
+from typing import Callable
+
 import numpy as np
 
-from py.agents_gen import clip_outcomes
+from py.agents_gen import clip_outcomes, gen_predictions
 from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents, \
   gen_outcomes
 
@@ -120,17 +122,20 @@ class ThetaGenerator:
 
 
 class Simulator:
-  def __init__(self, num_agents: int, has_same_effort: bool, does_clip: bool, does_normalise: bool):
+  def __init__(self, num_agents: int, has_same_effort: bool, does_clip: bool, does_normalise: bool,
+               selection_func: Callable[[np.ndarray, float], np.ndarray]):
     self._num_agents = num_agents  # per round
     self._has_same_effort = has_same_effort
     self._does_clip = does_clip
     self._does_normalise = does_normalise
+    self._selection_func = selection_func
 
     self.u = None
     self.b_tr = None
     self.thetas_tr = None
     self.x_tr = None
     self.eet_mean = None
+    self.y_hat = None
 
     self.o = None
     self.y = None
@@ -154,9 +159,10 @@ class Simulator:
     has_same_effort = self._has_same_effort
     does_clip = self._does_clip
     does_normalise = self._does_normalise
+    selection_func = self._selection_func
 
     # agents are spawned
-    u, b_tr, e = gen_base_agents(length=(T * s), has_same_effort=has_same_effort)
+    u, b_tr, e_stack = gen_base_agents(length=(T * s), has_same_effort=has_same_effort)
     b_tr = clip_covariates(b_tr) if does_clip else b_tr
 
     # compute average thetas
@@ -168,17 +174,20 @@ class Simulator:
     avg_theta_tr = ThetaGenerator.intra_round_repeat(thetas_tr=avg_theta_tr, repeats=s)  # (Txs,m)
 
     # agents take strategic actions
-    x_tr = gen_covariates(b_tr=b_tr, e=e, avg_theta_tr=avg_theta_tr)
+    x_tr = gen_covariates(b_tr=b_tr, e_stack=e_stack, avg_theta_tr=avg_theta_tr)
     x_tr = clip_covariates(x_tr) if does_clip else x_tr
 
     # normalise agents' data
-    e_mean = e.mean(axis=0)
+    e_mean = e_stack.mean(axis=0)
     eet_mean = e_mean.dot(e_mean.T)
     if does_normalise:
       b_tr, x_tr, eet_mean = normalise_agents(b_tr=b_tr, x_tr=x_tr, eet_mean=eet_mean)
 
-    # TODO: add admissions and enrollments
-    # y_hat goes here
+    # predict agents' performance
+    x_norm = (x_tr - x_tr.mean(axis=0, keepdims=True)) / x_tr.std(axis=0, keepdims=True)
+    y_hat = gen_predictions(x_tr=x_norm, thetas_tr=thetas_tr)
+
+    # send them admission offers
 
     # assignment
     self.u = u  # TODO: to be removed
@@ -186,6 +195,7 @@ class Simulator:
     self.thetas_tr = thetas_tr  # TODO: to be removed
     self.x_tr = x_tr
     self.eet_mean = eet_mean
+    self.y_hat = y_hat
 
     return
 

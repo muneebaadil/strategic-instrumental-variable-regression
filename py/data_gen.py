@@ -280,9 +280,17 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   else:  # set as given
     raise NotImplementedError("Use Simulator instead!")
 
+  if args.rank_type == 'prediction':
+    selection_func = compute_percentile_admissions
+  elif args.rank_type == 'uniform':
+    selection_func = compute_random_admissions
+  else:
+    raise ValueError(args.rank_type)
+
   sim = Simulator(
     num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
-    does_clip=args.clip, does_normalise=args.normalize
+    does_clip=args.clip, does_normalise=args.normalize,
+    selection_func=selection_func
   )
   sim.deploy(thetas_tr=theta,gammas=args.pref_vect)
   u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
@@ -302,12 +310,7 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
 
   # our setup addition
   # computing admission results.
-  x_norm = (x_tr - x_tr.mean(axis=0, keepdims=True)) / x_tr.std(axis=0, keepdims=True)
-  x_norm = x_norm[np.newaxis]
-  y_hat_logits = (x_norm * theta)
-  # y_hat_logits = y_hat_logits - y_hat_logits.mean(axis=1, keepdims=True)
-  # y_hat_logits = y_hat_logits / y_hat_logits.std(axis=1, keepdims=True)
-  y_hat = y_hat_logits.sum(axis=-1)
+  y_hat = sim.y_hat.T
 
   def _get_selection(_y_hat, n_rounds, accept_rate, rank_type):
     _w = np.zeros_like(_y_hat)
@@ -318,7 +321,7 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
       if rank_type == 'prediction':
         w_r = compute_percentile_admissions(y_hat=_y_hat_r, p=accept_rate)
       elif rank_type == 'uniform':
-        w_r = compute_random_admissions(length=len(_y_hat_r), p=accept_rate)
+        w_r = compute_random_admissions(y_hat=_y_hat_r, p=accept_rate)
       else:
         raise ValueError(rank_type)
       _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r

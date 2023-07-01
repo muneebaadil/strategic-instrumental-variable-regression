@@ -1,5 +1,7 @@
 """
 To generate data for agents.
+Specifically, the CSL setting with 2-dimensional covariates and with linear mechanisms.
+
 Might be coupled with environments/decision makers:
 - In generating noise.
 - In 'not' generating gammas alongside base agents.
@@ -30,6 +32,10 @@ def clip_covariates(x_tr: np.ndarray) -> np.ndarray:
   return x_tr
 
 
+def clip_outcomes(y: np.ndarray):
+  return np.clip(y, 0, 4)  # GPA
+
+
 def normalise_agents(b_tr: np.ndarray, x_tr: np.ndarray, eet_mean: np.ndarray) \
     -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
   """
@@ -51,10 +57,6 @@ def normalise_agents(b_tr: np.ndarray, x_tr: np.ndarray, eet_mean: np.ndarray) \
   eet_mean = np.matmul(np.array([[scale1, 0], [0, scale2]]), eet_mean)
 
   return b_tr, x_tr, eet_mean
-
-
-def clip_outcomes(y: np.ndarray):
-  return np.clip(y, 0, 4)  # GPA
 
 
 def gen_base_agents(length: int, has_same_effort: bool) \
@@ -91,18 +93,18 @@ def gen_base_agents(length: int, has_same_effort: bool) \
     top_noise = multipliers * np.random.normal(loc=0.5, scale=0.5, size=T)
     bottom_noise = multipliers * np.random.normal(loc=0.1, scale=0.1, size=T)
 
-  e = np.tile([[10.0, 0], [0, 1.0]], reps=(T, 1, 1))
-  e[:, 0, 0] += top_noise
-  e[:, 1, 1] += bottom_noise
+  e_stack = np.tile([[10.0, 0], [0, 1.0]], reps=(T, 1, 1))
+  e_stack[:, 0, 0] += top_noise
+  e_stack[:, 1, 1] += bottom_noise
 
-  return u, b_tr, e
+  return u, b_tr, e_stack
 
 
-def gen_covariates(b_tr: np.ndarray, e: np.ndarray, avg_theta_tr: np.ndarray) -> np.ndarray:
+def gen_covariates(b_tr: np.ndarray, e_stack: np.ndarray, avg_theta_tr: np.ndarray) -> np.ndarray:
   """
   Args:
     b_tr (np.ndarray): a (T,m) matrix of 'T' base covariates
-    e (np.ndarray): a (T,m,m) collection of 'T' effort matrices.
+    e_stack (np.ndarray): a (T,m,m) collection of 'T' effort matrices.
     avg_theta_tr (np.ndarray): a (T,m) matrix of 'T' avg_thetas.
 
   Returns:
@@ -111,17 +113,42 @@ def gen_covariates(b_tr: np.ndarray, e: np.ndarray, avg_theta_tr: np.ndarray) ->
 
   # check the dimensions
   T, m = b_tr.shape
-  assert e.shape == (T, m, m)
+  assert e_stack.shape == (T, m, m)
   assert avg_theta_tr.shape == (T, m)
 
   # G is a collection of eeT
-  G = e @ e.transpose((0, 2, 1))
+  G = e_stack @ e_stack.transpose((0, 2, 1))
 
+  # (T,m) & (T,m,m) -> (T,m)
   # a vertical stack of individual row vectors,
   # where each row can be expressed as: x_tr = b_tr + avg_theta_tr(eeT)
-  x_tr = b_tr + np.einsum('ij,ikj->ij', avg_theta_tr, G)
+  x_tr: np.ndarray = b_tr + np.einsum('ij,ikj->ij', avg_theta_tr, G)
+
+  # verify the dimensions
+  assert (T, m) == x_tr.shape
 
   return x_tr
+
+
+def gen_predictions(x_tr: np.ndarray, thetas_tr: np.ndarray) -> np.ndarray:
+  """
+  Args:
+    x_tr (np.ndarray): a (T,m) matrix of covariates.
+    thetas_tr (np.ndarray): a (T,n,m) tensor of thetas.
+  Returns:
+    np.ndarray: a (T,n) matrix of predictions.
+  """
+  # check the dimensions
+  (T, n, m) = thetas_tr.shape
+  assert (T, m) == x_tr.shape
+
+  # (T,m) & (T,n,m) -> (T,n)
+  y_hat = np.einsum('ij,ikj->ik', x_tr, thetas_tr)
+
+  # verify the dimensions
+  assert (T, n) == y_hat.shape
+
+  return y_hat
 
 
 def gen_outcomes(u: np.ndarray, x_tr: np.ndarray, theta_stars_tr: np.ndarray) \
@@ -167,16 +194,16 @@ def compute_percentile_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:
   return admissions
 
 
-def compute_random_admissions(length: int, p: float) -> np.ndarray:
+def compute_random_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:
   """
   Args:
-    length (int): the number of candidate agents.
+    y_hat (np.ndarray): a (T,) vector containing predicted outcomes.
     p (float): the acceptance rate.
 
   Returns:
     np.ndarray: a (T,) vector containing admission statuses.
   """
-  return np.random.choice([True, False], size=length, p=[p, 1 - p])
+  return np.random.choice([True, False], size=len(y_hat), p=[p, 1 - p])
 
 
 def realise_enrollments(w_tr: np.ndarray, gammas_tr: np.ndarray) -> np.ndarray:
