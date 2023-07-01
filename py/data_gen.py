@@ -280,19 +280,12 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   else:  # set as given
     raise NotImplementedError("Use Simulator instead!")
 
-  if args.rank_type == 'prediction':
-    selection_func = compute_percentile_admissions
-  elif args.rank_type == 'uniform':
-    selection_func = compute_random_admissions
-  else:
-    raise ValueError(args.rank_type)
-
   sim = Simulator(
     num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
     does_clip=args.clip, does_normalise=args.normalize,
-    selection_func=selection_func
+    ranking_type=args.rank_type
   )
-  sim.deploy(thetas_tr=theta,gammas=args.pref_vect)
+  sim.deploy(thetas_tr=theta,gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
   u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
 
   # true outcomes (college gpa)
@@ -311,29 +304,7 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   # our setup addition
   # computing admission results.
   y_hat = sim.y_hat.T
-
-  def _get_selection(_y_hat, n_rounds, accept_rate, rank_type):
-    _w = np.zeros_like(_y_hat)
-    # comparing applicants coming in the same rounds.
-    for r in range(n_rounds):
-      _y_hat_r = _y_hat[r * applicants_per_round: (r + 1) * applicants_per_round]
-
-      if rank_type == 'prediction':
-        w_r = compute_percentile_admissions(y_hat=_y_hat_r, p=accept_rate)
-      elif rank_type == 'uniform':
-        w_r = compute_random_admissions(y_hat=_y_hat_r, p=accept_rate)
-      else:
-        raise ValueError(rank_type)
-      _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
-    return _w
-
-  w = np.zeros((args.num_envs, num_applicants))
-  for env_idx in range(args.num_envs):
-    w[env_idx] = _get_selection(
-      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type
-    )
-
-  z = realise_enrollments(w_tr=w.T, gammas_tr=np.tile(args.pref_vect, reps=(num_applicants, 1)))
+  w, z = sim.w_tr.T, sim.z
 
   # for backwards compatibility
   adv_idx = np.where(u is True)

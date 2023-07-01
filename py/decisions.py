@@ -1,8 +1,7 @@
-from typing import Callable
-
 import numpy as np
 
-from py.agents_gen import clip_outcomes, gen_predictions
+from py.agents_gen import clip_outcomes, gen_predictions, compute_percentile_admissions, \
+  compute_random_admissions, realise_enrollments
 from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents, \
   gen_outcomes
 
@@ -123,12 +122,18 @@ class ThetaGenerator:
 
 class Simulator:
   def __init__(self, num_agents: int, has_same_effort: bool, does_clip: bool, does_normalise: bool,
-               selection_func: Callable[[np.ndarray, float], np.ndarray]):
+               ranking_type: str):
     self._num_agents = num_agents  # per round
     self._has_same_effort = has_same_effort
     self._does_clip = does_clip
     self._does_normalise = does_normalise
-    self._selection_func = selection_func
+
+    if ranking_type == 'prediction':
+      self._selection_func = compute_percentile_admissions
+    elif ranking_type == 'uniform':
+      self._selection_func = compute_random_admissions
+    else:
+      raise ValueError(ranking_type)
 
     self.u = None
     self.b_tr = None
@@ -136,17 +141,20 @@ class Simulator:
     self.x_tr = None
     self.eet_mean = None
     self.y_hat = None
+    self.w_tr = None
+    self.z = None
 
     self.o = None
     self.y = None
 
     return
 
-  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray) -> None:
+  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray, admission_rates: np.ndarray) -> None:
     """
     Args:
       thetas_tr (np.ndarray): a (T,n,m) matrix of thetas.
       gammas (np.ndarray): a (n,) vector of gammas.
+      admission_rates (np.ndarray): a (n,) vector of admission rates.
     Returns:
       None
     """
@@ -188,6 +196,17 @@ class Simulator:
     y_hat = gen_predictions(x_tr=x_norm, thetas_tr=thetas_tr)
 
     # send them admission offers
+    w = np.zeros(shape=(n, T * s))
+    for i in range(n):
+      for j in range(T * s):
+        idx1 = j * s  # first index in this batch of agents
+        idx2 = (j + 1) * s  # first index of the next batch
+
+        # admissions are computed within each batch (i.e., each round).
+        w[i, idx1:idx2] = selection_func(y_hat=y_hat[idx1:idx2], p=admission_rates[i])
+
+    # agents comply to at most one principal
+    z = realise_enrollments(w_tr=w.T, gammas_tr=np.tile(gammas, reps=(T * s, 1)))
 
     # assignment
     self.u = u  # TODO: to be removed
@@ -196,6 +215,8 @@ class Simulator:
     self.x_tr = x_tr
     self.eet_mean = eet_mean
     self.y_hat = y_hat
+    self.w_tr = w.T
+    self.z = z
 
     return
 

@@ -187,7 +187,7 @@ def compute_percentile_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:
     p (float): the acceptance rate.
 
   Returns:
-    np.ndarray: a (T,) vector containing admission statuses.
+    np.ndarray: a (T,) vector containing Boolean-typed admission statuses.
   """
   cdf = y_hat.argsort() / len(y_hat)
   admissions: np.ndarray = (cdf >= (1 - p))
@@ -201,7 +201,7 @@ def compute_random_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:
     p (float): the acceptance rate.
 
   Returns:
-    np.ndarray: a (T,) vector containing admission statuses.
+    np.ndarray: a (T,) vector containing Boolean-typed admission statuses.
   """
   return np.random.choice([True, False], size=len(y_hat), p=[p, 1 - p])
 
@@ -211,9 +211,8 @@ def realise_enrollments(w_tr: np.ndarray, gammas_tr: np.ndarray) -> np.ndarray:
   Args:
     w_tr (np.ndarray): a (T,n) matrix of admissions.
     gammas_tr (np.ndarray): a (T,n) matrix of preferences.
-
   Returns:
-
+    np.ndarray: a (T,) vector of enrollments.
   """
 
   # check the dimensions
