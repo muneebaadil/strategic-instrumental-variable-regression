@@ -1,3 +1,5 @@
+from typing import Iterable
+
 import numpy as np
 
 from py.agents_gen import clip_outcomes, gen_predictions, compute_percentile_admissions, \
@@ -149,18 +151,22 @@ class Simulator:
 
     return
 
-  def deploy(self, thetas_tr: np.ndarray, gammas: np.ndarray, admission_rates: np.ndarray) -> None:
+  def deploy(self, thetas_tr: np.ndarray, gammas: Iterable, admission_rates: Iterable) -> None:
     """
     Args:
-      thetas_tr (np.ndarray): a (T,n,m) matrix of thetas.
-      gammas (np.ndarray): a (n,) vector of gammas.
-      admission_rates (np.ndarray): a (n,) vector of admission rates.
+      thetas_tr (np.ndarray): a (T,n,m) matrix of 'non-repeated' thetas.
+      gammas (Iterable): a (n,) vector of gammas.
+      admission_rates (Iterable): a (n,) vector of admission rates.
     Returns:
       None
     """
+    gammas = np.array(gammas)
+    admission_rates = np.array(admission_rates)
+
     # check the dimensions
     T, n, m = thetas_tr.shape
     assert n == gammas.shape[0]
+    assert n == admission_rates.shape[0]
 
     # init params
     s = self._num_agents
@@ -193,7 +199,7 @@ class Simulator:
 
     # predict agents' performance
     x_norm = (x_tr - x_tr.mean(axis=0, keepdims=True)) / x_tr.std(axis=0, keepdims=True)
-    y_hat = gen_predictions(x_tr=x_norm, thetas_tr=thetas_tr)
+    y_hat = gen_predictions(x_tr=x_norm, thetas_tr=thetas_tr)  # (Txs,n)
 
     # send them admission offers
     w = np.zeros(shape=(n, T * s))
@@ -203,7 +209,7 @@ class Simulator:
         idx2 = (j + 1) * s  # first index of the next batch
 
         # admissions are computed within each batch (i.e., each round).
-        w[i, idx1:idx2] = selection_func(y_hat=y_hat[idx1:idx2], p=admission_rates[i])
+        w[i, idx1:idx2] = selection_func(y_hat=y_hat[idx1:idx2, i], p=admission_rates[i])
 
     # agents comply to at most one principal
     z = realise_enrollments(w_tr=w.T, gammas_tr=np.tile(gammas, reps=(T * s, 1)))
@@ -220,14 +226,16 @@ class Simulator:
 
     return
 
-  def enroll(self, theta_stars_tr: np.ndarray) -> None:
+  def enroll(self, theta_stars_tr: Iterable) -> None:
     """
     Counterfactually/Potentially enroll agents into environments and get their outcomes.
     Args:
-      theta_stars_tr (np.ndarray): a (n,m) matrix of 'n' theta_stars.
+      theta_stars_tr (Iterable): a (n,m) matrix of 'n' theta_stars.
     Returns:
       None
     """
+    theta_stars_tr = np.array(theta_stars_tr)
+
     # init params
     u = self.u
     x_tr = self.x_tr

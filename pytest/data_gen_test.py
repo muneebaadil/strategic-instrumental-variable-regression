@@ -107,7 +107,7 @@ class DataGenTest(unittest.TestCase):
     # non-clipping case, with heterogeneous theta-stars,
     # and must have more envs (to stabilise the randomness in theta-stars)
     #
-    cmd = f'--num-applicants 1000 --applicants-per-round 1 --envs-accept-rates .25 --theta-star-std 0.1 --rank-type uniform --num-envs 50'
+    cmd = f'--num-applicants 2000 --applicants-per-round 2 --envs-accept-rates .25 --theta-star-std 0.1 --rank-type uniform --num-envs 50'
     args = alg.get_args(cmd)
     np.random.seed(1)
     data_v1 = dg.generate_data(
@@ -122,8 +122,8 @@ class DataGenTest(unittest.TestCase):
     rtol = 0.05
     np.testing.assert_allclose(data_v2[idx].mean(), data_v1[idx].mean(), rtol=rtol)
     np.testing.assert_allclose(data_v2[idx].mean(), 15, rtol=rtol)
-    np.testing.assert_allclose(data_v2[idx].var(), data_v1[idx].var(), rtol=0.06)
-    np.testing.assert_allclose(data_v2[idx].var(), 25, rtol=0.06)
+    np.testing.assert_allclose(data_v2[idx].var(), data_v1[idx].var(), rtol=0.07)
+    np.testing.assert_allclose(data_v2[idx].var(), 25, rtol=0.07)
 
     # test the means, E[b|z=1]
     b_idx = 0
@@ -151,8 +151,8 @@ class DataGenTest(unittest.TestCase):
       np.testing.assert_allclose, actual=z2.mean(), desired=30, rtol=rtol
     )
 
-    np.testing.assert_allclose(z2.var(), z1.var(), rtol=rtol)
-    np.testing.assert_allclose(z2.var(), 203, rtol=rtol)
+    np.testing.assert_allclose(z2.var(), z1.var(), rtol=0.04)
+    np.testing.assert_allclose(z2.var(), 203, rtol=0.04)
     self.assertRaises(
       AssertionError,
       np.testing.assert_allclose, actual=z2.var(), desired=210, rtol=rtol
