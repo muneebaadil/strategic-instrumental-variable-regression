@@ -4,8 +4,6 @@ from typing import Tuple, List
 
 import numpy as np
 
-from py.agents_gen import gen_base_agents, gen_covariates, gen_outcomes, \
-  compute_percentile_admissions, compute_random_admissions, realise_enrollments
 from py.decisions import ThetaGenerator, Simulator
 from py.utils import normalize
 

@@ -2,10 +2,9 @@ from typing import Iterable
 
 import numpy as np
 
-from py.agents_gen import clip_outcomes, gen_predictions, compute_percentile_admissions, \
-  compute_random_admissions, realise_enrollments
-from py.agents_gen import gen_base_agents, clip_covariates, gen_covariates, normalise_agents, \
-  gen_outcomes
+from py.agents_gen import clip_covariates, normalise_agents, DEFAULT_AGENTS_MODEL
+from py.agents_gen import clip_outcomes, evaluate_agents, compute_percentile_admissions, \
+  compute_random_admissions, AgentsGenericModel
 
 
 class ThetaGenerator:
@@ -59,7 +58,7 @@ class ThetaGenerator:
     T = self._T
     n = self._n
 
-    # TODO: is 'mean_shift' necessary?
+    # TODO (kiet): is 'mean_shift' necessary?
 
     thetas_tr = [np.array([])] * n  # empty list
     for i in range(n):
@@ -100,7 +99,8 @@ class ThetaGenerator:
     for i in range(num_free_principals):
       non_coop_thetas_tr[i] = (
         ThetaGenerator(length=T, num_principals=1)
-          .generate_scaled_duplicates(deploy_sd_every=(2 + i),  # TODO: is shifting this necessary?
+          .generate_scaled_duplicates(deploy_sd_every=(2 + i),
+                                      # TODO (kiet): is shifting this necessary?
                                       mean_shift=num_cooperative_principals)
       ).transpose((1, 0, 2))  # (n,T,m)
 
@@ -123,12 +123,17 @@ class ThetaGenerator:
 
 
 class Simulator:
-  def __init__(self, num_agents: int, has_same_effort: bool, does_clip: bool, does_normalise: bool,
-               ranking_type: str):
+  def __init__(self,
+               num_agents: int,
+               has_same_effort: bool, does_clip: bool, does_normalise: bool, ranking_type: str,
+               agents_model: AgentsGenericModel = DEFAULT_AGENTS_MODEL):
+
     self._num_agents = num_agents  # per round
     self._has_same_effort = has_same_effort
     self._does_clip = does_clip
     self._does_normalise = does_normalise
+
+    self._agents_model = agents_model
 
     if ranking_type == 'prediction':
       self._selection_func = compute_percentile_admissions
@@ -174,9 +179,10 @@ class Simulator:
     does_clip = self._does_clip
     does_normalise = self._does_normalise
     selection_func = self._selection_func
+    am = self._agents_model
 
     # agents are spawned
-    u, b_tr, e_stack = gen_base_agents(length=(T * s), has_same_effort=has_same_effort)
+    u, b_tr, e_stack = am.gen_base_agents(length=(T * s), has_same_effort=has_same_effort)
     b_tr = clip_covariates(b_tr) if does_clip else b_tr
 
     # compute average thetas
@@ -188,7 +194,7 @@ class Simulator:
     avg_theta_tr = ThetaGenerator.intra_round_repeat(thetas_tr=avg_theta_tr, repeats=s)  # (Txs,m)
 
     # agents take strategic actions
-    x_tr = gen_covariates(b_tr=b_tr, e_stack=e_stack, avg_theta_tr=avg_theta_tr)
+    x_tr = am.gen_covariates(b_tr=b_tr, e_stack=e_stack, avg_theta_tr=avg_theta_tr)
     x_tr = clip_covariates(x_tr) if does_clip else x_tr
 
     # normalise agents' data
@@ -199,7 +205,7 @@ class Simulator:
 
     # predict agents' performance
     x_norm = (x_tr - x_tr.mean(axis=0, keepdims=True)) / x_tr.std(axis=0, keepdims=True)
-    y_hat = gen_predictions(x_tr=x_norm, thetas_tr=thetas_tr)  # (Txs,n)
+    y_hat = evaluate_agents(x_tr=x_norm, thetas_tr=thetas_tr)  # (Txs,n)
 
     # send them admission offers
     w = np.zeros(shape=(n, T * s))
@@ -212,12 +218,12 @@ class Simulator:
         w[i, idx1:idx2] = selection_func(y_hat=y_hat[idx1:idx2, i], p=admission_rates[i])
 
     # agents comply to at most one principal
-    z = realise_enrollments(w_tr=w.T, gammas_tr=np.tile(gammas, reps=(T * s, 1)))
+    z = am.realise_enrollments(w_tr=w.T, gammas_tr=np.tile(gammas, reps=(T * s, 1)))
 
     # assignment
-    self.u = u  # TODO: to be removed
+    self.u = u  # TODO (kiet): to be removed
     self.b_tr = b_tr
-    self.thetas_tr = thetas_tr  # TODO: to be removed
+    self.thetas_tr = thetas_tr  # TODO(kiet): to be removed
     self.x_tr = x_tr
     self.eet_mean = eet_mean
     self.y_hat = y_hat
@@ -240,9 +246,10 @@ class Simulator:
     u = self.u
     x_tr = self.x_tr
     does_clip = self._does_clip
+    am = self._agents_model
 
     # start here
-    o, y = gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_stars_tr)
+    o, y = am.gen_outcomes(u=u, x_tr=x_tr, theta_stars_tr=theta_stars_tr)
     y = clip_outcomes(y) if does_clip else y
 
     # assignment
