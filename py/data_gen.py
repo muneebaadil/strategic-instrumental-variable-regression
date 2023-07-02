@@ -4,20 +4,8 @@ from typing import Tuple, List
 
 import numpy as np
 
-
-def normalize(arrs: list, new_min: float, new_max: float) -> Tuple[List[float], float]:
-  new_range = new_max - new_min
-  curr_min = np.concatenate(arrs).min()
-  curr_max = np.concatenate(arrs).max()
-
-  curr_range = curr_max - curr_min
-
-  out = []
-  for arr in arrs:
-    out.append(
-      (((arr - curr_min) / curr_range) * new_range) + new_min
-    )
-  return out, new_range / curr_range
+from py.decisions import ThetaGenerator, Simulator
+from py.utils import normalize
 
 
 def sample_effort_conversion(EW, n_samples, adv_idx, fixed_effort_conversion):
@@ -118,6 +106,7 @@ def generate_bt(n_samples: int, sigma_sat: float, sigma_gpa: float, args: argpar
   g += np.random.normal(1, 0.2, size=(args.num_applicants, args.num_envs))  # non-zero-mean
   return b, g, adv_idx, disadv_idx
 
+
 def compute_xt(EWi: np.ndarray, b: np.ndarray, theta: np.ndarray, pref_vect: np.ndarray,
                args: argparse.Namespace) -> np.ndarray:
   assert EWi.shape[0] == b.shape[0]
@@ -148,6 +137,7 @@ def _get_selection(_y_hat, n_rounds, accept_rate, rank_type, applicants_per_roun
     w_r = get_selection(_y_hat_r, accept_rate, rank_type)
     _w[r * applicants_per_round: (r + 1) * applicants_per_round] = w_r
   return _w
+
 
 def get_selection(y_hat, accept_rate, rank_type):
   if rank_type == 'prediction':
@@ -183,6 +173,7 @@ def generate_thetas(args: argparse.Namespace) -> np.ndarray:
 
   thetas = np.stack(thetas)
   return thetas
+
 
 # for notebook.
 def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
@@ -262,3 +253,59 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
       _idx = temp.flatten().nonzero()[0]
       z[idx] = _idx + 1  # offset to avoid conflict with "no uni" decision
   return b, x, y, EET, theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
+
+
+def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
+                     args: argparse.Namespace, _theta: np.ndarray = None) \
+    -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+             np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+  theta_star = np.zeros(shape=(args.num_envs, 2))
+  theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
+
+  assert num_applicants % applicants_per_round == 0
+  n_rounds = int(num_applicants / applicants_per_round)
+
+  # assessment rule
+  if _theta is None:  # distribute randomly.
+    thegen = ThetaGenerator(length=n_rounds, num_principals=args.num_envs)
+    if args.scaled_duplicates is None:
+      theta = thegen.generate_randomly()  # (T,n,m)
+    elif args.scaled_duplicates == 'sequence':
+      theta = thegen.generate_general_coop_case(num_cooperative_principals=args.num_cooperative_envs)
+    else:
+      raise ValueError(args.scaled_duplicates)
+  else:  # set as given
+    assert _theta.shape == (args.num_envs, 2)  # (n,m)
+    theta = np.tile(_theta, reps=(n_rounds, 1, 1))  # (T,n,m)
+
+  sim = Simulator(
+    num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
+    does_clip=args.clip, does_normalise=args.normalize,
+    ranking_type=args.rank_type
+  )
+  sim.deploy(thetas_tr=theta, gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
+  u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
+
+  # true outcomes (college gpa)
+  sim.enroll(theta_stars_tr=theta_star)
+  o, y = sim.o, sim.y
+
+  # for backwards compatibility
+  theta = theta.transpose((1,0,2))
+  y = y.T
+
+  assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
+  assert theta.shape == (args.num_envs, args.num_applicants, 2)
+  assert o.shape == (args.num_applicants, args.num_envs)
+  assert theta_star.shape == (args.num_envs, 2)
+
+  # our setup addition
+  # computing admission results.
+  y_hat = sim.y_hat.T
+  w, z = sim.w_tr.T, sim.z
+
+  # for backwards compatibility
+  adv_idx = np.where(u is True)
+  disadv_idx = np.where(u is False)
+
+  return b_tr, x_tr, y, eet_mean, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect
