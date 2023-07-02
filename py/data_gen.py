@@ -241,8 +241,7 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   w = np.zeros((args.num_envs, num_applicants))
   for env_idx in range(args.num_envs):
     w[env_idx] = _get_selection(
-      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type,
-      args.applicants_per_round
+      y_hat[env_idx], n_rounds, args.envs_accept_rates[env_idx], args.rank_type, args.applicants_per_round
     )
 
   z = np.zeros((args.num_applicants,))
@@ -272,13 +271,14 @@ def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effor
   if _theta is None:  # distribute randomly.
     thegen = ThetaGenerator(length=n_rounds, num_principals=args.num_envs)
     if args.scaled_duplicates is None:
-      theta = thegen.generate_randomly()
+      theta = thegen.generate_randomly()  # (T,n,m)
     elif args.scaled_duplicates == 'sequence':
       theta = thegen.generate_general_coop_case(num_cooperative_principals=args.num_cooperative_envs)
     else:
       raise ValueError(args.scaled_duplicates)
   else:  # set as given
-    raise NotImplementedError("Use Simulator instead!")
+    assert _theta.shape == (args.num_envs, 2)  # (n,m)
+    theta = np.tile(_theta, reps=(n_rounds, 1, 1))  # (T,n,m)
 
   sim = Simulator(
     num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
