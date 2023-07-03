@@ -88,26 +88,29 @@ class ThetaGenerator:
 
     # check input
     num_free_principals = n - num_cooperative_principals
-    assert num_free_principals >= 1
+    assert num_free_principals >= 0
 
-    coop_thetas_tr = (
+    # generate thetas of coop decision makers.
+    thetas_tr = (
       ThetaGenerator(length=T, num_principals=num_cooperative_principals)
         .generate_scaled_duplicates(deploy_sd_every=1)
     ).transpose((1, 0, 2))  # (n,T,m)
 
-    non_coop_thetas_tr = [] * num_free_principals
-    for i in range(num_free_principals):
-      non_coop_thetas_tr[i] = (
-        ThetaGenerator(length=T, num_principals=1)
-          .generate_scaled_duplicates(deploy_sd_every=(2 + i),
-                                      # TODO (kiet): is shifting this necessary?
-                                      mean_shift=num_cooperative_principals)
-      ).transpose((1, 0, 2))  # (n,T,m)
+    # generate thetas of non-coop decision makers.
+    if num_free_principals >= 1:
+      non_coop_thetas_tr = [] * num_free_principals
+      for i in range(num_free_principals):
+        non_coop_thetas_tr[i] = (
+          ThetaGenerator(length=T, num_principals=1)
+            .generate_scaled_duplicates(deploy_sd_every=(2 + i),
+                                        # TODO (kiet): is shifting this necessary?
+                                        mean_shift=num_cooperative_principals)
+            .transpose((1, 0, 2))  # (n,T,m)
+        )
 
-    # (T,n,m)
-    thetas_tr = np.concatenate((coop_thetas_tr, *non_coop_thetas_tr), axis=0).transpose((1, 0, 2))
+      thetas_tr = np.concatenate((thetas_tr, *non_coop_thetas_tr), axis=0)
 
-    return thetas_tr
+    return thetas_tr.transpose((1, 0, 2))  # (T,n,m)
 
   @staticmethod
   def intra_round_repeat(thetas_tr: np.ndarray, repeats: int) -> np.ndarray:
