@@ -90,11 +90,20 @@ def compute_percentile_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:
     np.ndarray: a (T,) vector containing Boolean-typed admission statuses.
   """
   # check the dimensions
-  assert len(y_hat.shape) == 1
+  # assert len(y_hat.shape) == 1
 
-  cdf = y_hat.argsort() / len(y_hat)
-  admissions: np.ndarray = (cdf >= (1 - p))
-  return admissions
+  # cdf = y_hat.argsort() / float(len(y_hat))
+  # admissions: np.ndarray = (cdf >= (1 - p))
+  sort_idx = np.argsort(y_hat)
+
+  thres = int((1 - p) * sort_idx.size)
+  rejected_idx = sort_idx[:thres]
+  accepted_idx = sort_idx[thres:]
+
+  w_test = np.zeros_like(y_hat)
+  w_test[accepted_idx] = True
+  w_test[rejected_idx] = False
+  return w_test
 
 
 def compute_random_admissions(y_hat: np.ndarray, p: float) -> np.ndarray:

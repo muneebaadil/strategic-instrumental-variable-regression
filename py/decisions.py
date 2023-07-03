@@ -98,15 +98,14 @@ class ThetaGenerator:
 
     # generate thetas of non-coop decision makers.
     if num_free_principals >= 1:
-      non_coop_thetas_tr = [] * num_free_principals
+      non_coop_thetas_tr = [None] * num_free_principals
       for i in range(num_free_principals):
-        non_coop_thetas_tr[i] = (
-          ThetaGenerator(length=T, num_principals=1)
+        out = (ThetaGenerator(length=T, num_principals=1)
             .generate_scaled_duplicates(deploy_sd_every=(2 + i),
                                         # TODO (kiet): is shifting this necessary?
-                                        mean_shift=num_cooperative_principals)
-            .transpose((1, 0, 2))  # (n,T,m)
+                                        mean_shift=num_cooperative_principals).transpose((1, 0, 2))  # (n,T,m)
         )
+        non_coop_thetas_tr[i] = out
 
       thetas_tr = np.concatenate((thetas_tr, *non_coop_thetas_tr), axis=0)
 

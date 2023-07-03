@@ -176,7 +176,7 @@ def generate_thetas(args: argparse.Namespace) -> np.ndarray:
 
 
 # for notebook.
-def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
+def generate_data_v0(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
                   args: argparse.Namespace, _theta=None, ) \
 -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
              np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -255,7 +255,7 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   return b, x, y, EET, theta, w, z, y_hat, adv_idx, disadv_idx, g.T, theta_star, args.pref_vect
 
 
-def generate_data_v2(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
+def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
                      args: argparse.Namespace, _theta: np.ndarray = None) \
     -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
              np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
