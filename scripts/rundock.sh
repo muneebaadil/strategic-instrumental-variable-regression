@@ -1,6 +1,10 @@
 #!/bin/bash
 
-# Usage: rundock.sh <dir-containing-docker-file> ["int"|"nb"]
+# Usage: rundock.sh <dir-containing-docker-file> ["int"|"nb"|"python"] [<some-python-file>]
+# E.g.,
+#       bash scripts/rundock.sh . int
+#       bash scripts/rundock.sh . nb
+#       bash scripts/rundock.sh . python pytest/data_gen_test.py
 
 # User's params
 IMG_TAG="csl"
@@ -30,6 +34,8 @@ if [[ $launch_mode = "int" ]]; then
   docker run --rm -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} /bin/bash
 elif [[ $launch_mode = "nb" ]]; then
   docker run --rm -p 8888:8888 ${IMG_TAG} /bin/bash -c "jupyter notebook --ip 0.0.0.0 --no-browser --allow-root"
+elif [[ $launch_mode = "python" ]]; then
+  docker run --rm -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} python "$3"
 else
-  docker run --rm -v "$host_dir":$VIRTUAL_DIR -it ${IMG_TAG} python py/main.py
+  echo "Doing nothing!"
 fi

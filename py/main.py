@@ -1,99 +1,61 @@
-from multiprocessing import Pool
-
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
-from tqdm import tqdm
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import normalize as sk_normalize
 
-import lib
+from py.agents_gen import AgentsGenericModel
+from py.decisions import ThetaGenerator, Simulator
 
-PROGRESS_BAR = False
 OUT_DIR = "./out"
 
 
-def run_1st_exp():
-  n_runs = 2
-  cmd = f'--num-applicants 1000 --applicants-per-round 100 --clip --methods ols 2sls --stream'
-  args = lib.get_args(cmd)
-  args_list = [(s, args) for s in np.arange(n_runs)]
-  with Pool(n_runs) as p:
-    runs = p.starmap(lib.run_multi_exp,
-                     tqdm(args_list, total=len(args_list), disable=not PROGRESS_BAR))
+def run_utility_exp():
+  # params
+  T = 20
+  s = 1000
+  gammas = [0.45, 0.55]
+  admission_rates = [0.6, 0.6]
+  theta_stars_tr = [[0.0001, 0.5], [0.4, 0.6]]
 
-  df = lib.runs2df(runs)
-  dflong = pd.melt(df, id_vars='iterations', value_vars=('ols_env0', '2sls_env0'),
-                   var_name='method',
-                   value_name='error')
-  _, ax = plt.subplots()
-  sns.lineplot(data=dflong, x='iterations', y='error', hue='method', ax=ax)
-  ax.set_ylim(bottom=-0.001, top=0.2)
-  ax.set_ylabel(r'$|| \theta^* - \hat{hat}|| $')
-  ax.set_xlabel('number of rounds')
-  ax.grid()
+  # customise my agents' model
+  # am = DEFAULT_AGENTS_MODEL
+  am = AgentsGenericModel(
+    group_0_base_mean=[800, 0.8], group_0_base_cov=[[200 ** 2, 0], [0, 0.5 ** 2]],
+    group_1_base_mean=[1000, 2.25], group_1_base_cov=[[200 ** 2, 0], [0, 0.5 ** 2]],
+    group_0_outcome_mean_shift=200.5, group_0_outcome_std=0.2,
+    group_1_outcome_mean_shift=1.5, group_1_outcome_std=0.2
+  )
 
-  plt.savefig(f"{OUT_DIR}/01.pdf", format="pdf")
-  return
+  # generate thetas for regression
+  my_thetas_tr = ThetaGenerator(length=T, num_principals=1).generate_randomly()  # (T,1,2)
+  your_thetas_tr = np.tile([1, 1], reps=(T, 1, 1))  # (T,1,2)
+  delpoyed_thetas_tr = np.concatenate([my_thetas_tr, your_thetas_tr], axis=1)  # (T,2,2)
 
+  # deploy
+  sim = Simulator(num_agents=s, has_same_effort=True, does_clip=False,
+                  does_normalise=False, ranking_type='prediction', agents_model=am)
+  sim.deploy(thetas_tr=delpoyed_thetas_tr, gammas=gammas, admission_rates=admission_rates)
+  sim.enroll(theta_stars_tr=theta_stars_tr)
 
-def run_2nd_exp():
-  n_runs = 2
-  cmd = f'--num-applicants 1000 --applicants-per-round 100 --fixed-effort-conversion --scaled-duplicates sequence --b-bias 2 --num-envs 1 --pref uniform --methods ours 2sls ols'
-  args = lib.get_args(cmd)
-  args_list = [(s, args) for s in np.arange(n_runs)]
-  with Pool(n_runs) as p:
-    runs = p.starmap(lib.run_multi_exp,
-                     tqdm(args_list, total=len(args_list), disable=not PROGRESS_BAR))
-  df = lib.runs2df(runs)
+  # compute outputs, E[y|z]
+  y = sim.y[:, 0]  # extract the outcomes in env 1
+  z = sim.z
+  outputs = [
+    y[i * s:(i + 1) * s][z[i * s:(i + 1) * s] == 1].mean()
+    for i in range(T)
+  ]
 
-  # long format for plotting
-  value_vars = [f'{m}_env{e}' for m in args.methods for e in range(args.num_envs)]
-  dflong = pd.melt(df, id_vars='iterations', value_vars=value_vars, var_name='env',
-                   value_name='error')
-  dflong['method'] = dflong.env.apply(lambda x: x.split('_')[0])
-  dflong['env'] = dflong.env.apply(lambda x: x.split('_')[-1])
+  # do OLS
+  reg = LinearRegression()
+  reg.fit(X=my_thetas_tr.reshape(T, 2), y=outputs)
 
-  # dflong = pd.melt(df, id_vars='iterations', value_vars=('ours_env0', 'ours_env1'), var_name='env', value_name='error')
-  _, ax = plt.subplots()
-  sns.lineplot(dflong, x='iterations', y='error', errorbar=('ci', 95), ax=ax, hue='method')
-  ax.grid()
-  ax.set_ylim(bottom=-0.001, top=.2)
-  ax.set_ylabel(r'$|| \theta^* - \hat{hat}|| $')
-  ax.set_xlabel('number of rounds')
+  # [theta_AO, normalised_theta_star]
+  candidates = sk_normalize([reg.coef_, theta_stars_tr[0]], norm='l2', axis=1)
+  print(candidates.round(1))
 
-  plt.savefig(f"{OUT_DIR}/02.pdf", format="pdf")
-  return
+  # TODO (kiet): compare utility values
 
-
-def run_3rd_exp():
-  n_runs = 4
-  cmd = f'--num-applicants 5000 --applicants-per-round 100 --fixed-effort-conversion --scaled-duplicates sequence --b-bias 2 --num-envs 2 --pref uniform --methods ours 2sls ols'
-  args = lib.get_args(cmd)
-  args_list = [(s, args) for s in np.arange(n_runs)]
-  with Pool(n_runs) as p:
-    runs = p.starmap(lib.run_multi_exp,
-                     tqdm(args_list, total=len(args_list), disable=not PROGRESS_BAR))
-  df = lib.runs2df(runs)
-
-  value_vars = [f'{m}_env{e}' for m in args.methods for e in range(args.num_envs)]
-  dflong = pd.melt(df, id_vars='iterations', value_vars=value_vars, var_name='env',
-                   value_name='error')
-  dflong['method'] = dflong.env.apply(lambda x: x.split('_')[0])
-  dflong['env'] = dflong.env.apply(lambda x: x.split('_')[-1])
-
-  fig, ax = plt.subplots()
-  sns.lineplot(data=dflong, x='iterations', y='error', hue='method', style='env',
-               errorbar=('ci', 95), ax=ax)
-  ax.grid()
-  ax.set_ylim(bottom=-.001, top=.5)
-  ax.set_ylabel(r'$ || \theta^* - \hat{\theta}|| $')
-  ax.set_xlabel('number of rounds')
-
-  plt.savefig(f"{OUT_DIR}/03.pdf", format="pdf")
   return
 
 
 if __name__ == "__main__":
-  run_1st_exp()
-  run_2nd_exp()
-  # run_3rd_exp()
+  run_utility_exp()
