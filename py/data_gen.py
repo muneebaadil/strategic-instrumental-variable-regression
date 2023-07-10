@@ -305,7 +305,8 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   w, z = sim.w_tr.T, sim.z
 
   # for backwards compatibility
-  adv_idx = np.where(u is True)
-  disadv_idx = np.where(u is False)
+  adv_idx = np.where(u == True)
+  disadv_idx = np.where(u == False)
+  adv_idx, disadv_idx = adv_idx[0], disadv_idx[0]
 
   return b_tr, x_tr, y, eet_mean, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect
