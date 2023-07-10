@@ -170,6 +170,7 @@ def run_multi_env(seed, args, env_idx=None):
     args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
   )
 
+  # TODO (muneeb) clean this part.
   if args.num_envs == 1:
     y_utility, A, B = generate_data_utility(args, EW, theta, z, theta_star)
   else:
