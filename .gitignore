@@ -3,4 +3,5 @@
 college_admission_*
 experiments*/
 figures/
+figures-cache/
 *.pyc
