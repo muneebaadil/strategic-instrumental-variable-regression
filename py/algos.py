@@ -166,7 +166,7 @@ def our(x, y, theta, w):
 # %%
 def run_multi_env(seed, args, env_idx=None):
   np.random.seed(seed)
-  _, x, y, EW, theta, w, z, _, _, _, _, theta_star, pref_vect = data_gen.generate_data(
+  _, x, y, _, theta, w, z, _, _, _, _, theta_star, pref_vect = data_gen.generate_data(
     args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
   )
 
@@ -197,7 +197,6 @@ def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect):
 
   err_list, est_list = estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env,
                                               theta_env, z_env, upp_limits)
-  # TODO (Muneeb): ... (kiet) What to do here?
   return err_list, est_list
 
 
