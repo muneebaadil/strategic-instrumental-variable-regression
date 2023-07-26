@@ -170,17 +170,12 @@ def run_multi_env(seed, args, env_idx=None):
     args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
   )
 
-  # TODO (muneeb) clean this part.
-  if args.num_envs == 1:
-    y_utility, A, B = generate_data_utility(args, EW, theta, z, theta_star)
-  else:
-    y_utility, A, B = None, None, None
-
   err_list, est_list = {}, {}
   envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
   for env_idx in envs_itr:
-    dictenv_err, dictenv_est = run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect,
-                                              EW, y_utility, A, B)
+    dictenv_err, dictenv_est = run_single_env(
+      args, x, y, theta, z, theta_star, env_idx, pref_vect
+      )
     for k, v in dictenv_err.items():
       err_list[f'{k}_env{env_idx}'] = v
     for k, v in dictenv_est.items():
@@ -189,7 +184,7 @@ def run_multi_env(seed, args, env_idx=None):
   return err_list, w, z, est_list
 
 
-def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect, EW, y_utility, A, B):
+def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect):
   # extracting relevant variables for the environment i.
   y_env = y[env_idx].flatten()
   theta_env = theta[env_idx]
@@ -237,48 +232,7 @@ def estimate_causal_params(args, x, theta, theta_star, env_idx, pref_vect, y_env
       err_list[m][i] = np.linalg.norm(theta_star[env_idx] - est)
       est_list[m][i] = est
 
-  # # estimate EET.
-  # model = LinearRegression()
-  # model.fit(theta_env, x)
   return err_list, est_list  # , model.coef_.T
-
-
-def generate_data_utility(args: argparse.Namespace, EET: np.ndarray, theta: np.ndarray,
-                          z: np.ndarray, theta_star: np.ndarray):
-  """
-  Generate data according for utility.
-
-  Args:
-  EET: np.array, shape = (2,2).
-  theta: np.array, shape = (num_envs, num_applicants, 2)
-  z: np.array, shape = (num_applicants, )
-  theta_star: np.array, shape = (num_envs, 2)
-
-  Returns:
-  y, np.array, shape = (n_rounds, applicants_per_round). y_supportive_protocol[i] contains the output of
-    accepted applicants, np.nan is left elsewhere.
-  A: np.array, shape = (2, )
-  B: float
-  """
-  assert args.num_envs == 1, f"so far only implemented for a single environment"
-  env_idx = 0
-  theta_rounds_env = theta[env_idx, 0::args.applicants_per_round]  # (n_rounds, 2)
-  assert theta_rounds_env.ndim == 2
-  n_rounds = theta_rounds_env.shape[0]
-
-  A = np.array([1, 2])
-  B = 1.99
-  y_utility = np.ones(shape=(n_rounds, args.applicants_per_round)) * np.nan
-  for i, th in enumerate(theta_rounds_env):
-    # number of accepted students at uni, same as in cooperative protocol.
-    n_samples = (z[i * args.applicants_per_round: (
-                                                      i * args.applicants_per_round) + args.applicants_per_round] == env_idx + 1).sum()
-    base = A.dot(th) + B + np.random.normal(loc=0, scale=args.utility_dataset_std,
-                                            size=(n_samples,))
-    impr = th.dot((EET).dot(theta_star[env_idx]))
-
-    y_utility[i, :n_samples] = base + impr
-  return y_utility, A, B
 
 
 # convert to dataframe.
