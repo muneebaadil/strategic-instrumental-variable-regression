@@ -285,8 +285,8 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
   # pt. 3. optionally fix all but the first principal. 
   if fixed_competitors:
       # deployment rule of all but the first principal is fixed.
-      for i in range(1, args.num_envs):
-          theta[:, i, :] = theta[0, i, :]
+      for env_idx in range(1, args.num_envs):
+          theta[:, env_idx, :] = theta[0, env_idx, :]
   
   theta, b_tr, x_tr, eet_mean, o, y, y_hat, w, z, adv_idx, disadv_idx = run_simulator(
     applicants_per_round, fixed_effort_conversion, args, theta_star, theta
