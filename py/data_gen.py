@@ -256,16 +256,20 @@ def generate_data_v0(num_applicants: int, applicants_per_round: int, fixed_effor
 
 
 def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_conversion: bool,
-                     args: argparse.Namespace, _theta: np.ndarray = None) \
+                     args: argparse.Namespace, _theta: np.ndarray = None, _theta_star=None, fixed_competitors=False) \
     -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray,
              np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-  theta_star = np.zeros(shape=(args.num_envs, 2))
-  theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
+  # pt. 1. ground truth causal parameters. 
+  if _theta_star is None: # distribute randomly
+    theta_star = np.zeros(shape=(args.num_envs, 2))
+    theta_star[:, 1] = np.random.normal(loc=0.5, scale=args.theta_star_std, size=(args.num_envs,))
+  else: # set as given 
+    theta_star = _theta_star 
 
   assert num_applicants % applicants_per_round == 0
   n_rounds = int(num_applicants / applicants_per_round)
 
-  # assessment rule
+  # pt. 2. assessment rule
   if _theta is None:  # distribute randomly.
     thegen = ThetaGenerator(length=n_rounds, num_principals=args.num_envs)
     if args.scaled_duplicates is None:
@@ -278,35 +282,47 @@ def generate_data(num_applicants: int, applicants_per_round: int, fixed_effort_c
     assert _theta.shape == (args.num_envs, 2)  # (n,m)
     theta = np.tile(_theta, reps=(n_rounds, 1, 1))  # (T,n,m)
 
-  sim = Simulator(
-    num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
-    does_clip=args.clip, does_normalise=args.normalize,
-    ranking_type=args.rank_type
-  )
-  sim.deploy(thetas_tr=theta, gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
-  u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
-
-  # true outcomes (college gpa)
-  sim.enroll(theta_stars_tr=theta_star)
-  o, y = sim.o, sim.y
-
-  # for backwards compatibility
-  theta = theta.transpose((1,0,2))
-  y = y.T
-
-  assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
-  assert theta.shape == (args.num_envs, args.num_applicants, 2)
-  assert o.shape == (args.num_applicants, args.num_envs)
-  assert theta_star.shape == (args.num_envs, 2)
-
-  # our setup addition
-  # computing admission results.
-  y_hat = sim.y_hat.T
-  w, z = sim.w_tr.T, sim.z
-
-  # for backwards compatibility
-  adv_idx = np.where(u == True)
-  disadv_idx = np.where(u == False)
-  adv_idx, disadv_idx = adv_idx[0], disadv_idx[0]
+  # pt. 3. optionally fix all but the first principal. 
+  if fixed_competitors:
+      # deployment rule of all but the first principal is fixed.
+      for i in range(1, args.num_envs):
+          theta[:, i, :] = theta[0, i, :]
+  
+  theta, b_tr, x_tr, eet_mean, o, y, y_hat, w, z, adv_idx, disadv_idx = run_simulator(
+    applicants_per_round, fixed_effort_conversion, args, theta_star, theta
+    )
 
   return b_tr, x_tr, y, eet_mean, theta, w, z, y_hat, adv_idx, disadv_idx, o.T, theta_star, args.pref_vect
+
+def run_simulator(applicants_per_round, fixed_effort_conversion, args, theta_star, theta):
+    sim = Simulator(
+      num_agents=applicants_per_round, has_same_effort=fixed_effort_conversion,
+      does_clip=args.clip, does_normalise=args.normalize,
+      ranking_type=args.rank_type
+    )
+    sim.deploy(thetas_tr=theta, gammas=args.pref_vect, admission_rates=args.envs_accept_rates)
+    u, b_tr, theta, x_tr, eet_mean = sim.u, sim.b_tr, sim.thetas_tr, sim.x_tr, sim.eet_mean
+
+    # true outcomes (college gpa)
+    sim.enroll(theta_stars_tr=theta_star)
+    o, y = sim.o, sim.y
+
+    # for backwards compatibility
+    theta = theta.transpose((1,0,2))
+    y = y.T
+
+    assert x_tr[np.newaxis].shape == (1, args.num_applicants, 2)
+    assert theta.shape == (args.num_envs, args.num_applicants, 2)
+    assert o.shape == (args.num_applicants, args.num_envs)
+    assert theta_star.shape == (args.num_envs, 2)
+
+    # our setup addition
+    # computing admission results.
+    y_hat = sim.y_hat.T
+    w, z = sim.w_tr.T, sim.z
+
+    # for backwards compatibility
+    adv_idx = np.where(u == True)
+    disadv_idx = np.where(u == False)
+    adv_idx, disadv_idx = adv_idx[0], disadv_idx[0]
+    return theta,b_tr,x_tr,eet_mean,o,y,y_hat,w,z,adv_idx,disadv_idx
