@@ -8,7 +8,8 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 
-
+from py.utils import recover_thetas
+from py.data_gen import run_simulator
 # for notebook.
 
 def get_git_revision_hash() -> str:
@@ -163,12 +164,47 @@ def our(x, y, theta, w):
   return theta_star_est
 
 
-# %%
-def run_multi_env(seed, args, env_idx=None):
+def run_multi_env_utility(args, seed, test_theta_envs):
+    err_list, est_list, _, data_dict = run_multi_env(
+        seed, args, env_idx=None, fixed_competitors=True
+        )
+    y, z, theta, theta_star = \
+        data_dict['y'], data_dict['z'], data_dict['theta'], data_dict['theta_star']
+
+    # replacing the estimate of causal parameter of fixed competitors with the ground truth one.
+    for env_idx in range(1, args.num_envs):
+       est_list[f'ours_env{env_idx}'] = [theta_star[env_idx]]
+       err_list[f'ours_env{env_idx}'] = 0
+
+    # recovering test thetas. 
+    test_thetas = np.zeros(shape=(args.num_envs, 2))
+    for env_idx in range(args.num_envs):
+        test_thetas[env_idx] = recover_thetas(
+        args.num_applicants, args.applicants_per_round, 
+        y, theta, z, env_idx, est_list, test_theta_envs[env_idx]
+    )
+    test_thetas = test_thetas[np.newaxis]
+
+    # generating test data.
+    args.num_applicants = args.applicants_per_round # only one round.
+    _, _, _, _, _, y_test,_, _ ,z_test,_, _ = run_simulator(
+    args.applicants_per_round, args.fixed_effort_conversion, args, theta_star, test_thetas
+    )
+    y_test = y_test.T
+
+    # compute utilities 
+    utilities = np.zeros((args.num_envs,))
+    for env_idx in range(args.num_envs):
+        utilities[env_idx] = y_test[:,  env_idx][z_test==(env_idx+1)].mean()
+    return utilities
+
+def run_multi_env(seed, args, env_idx=None, fixed_competitors=False):
   np.random.seed(seed)
-  _, x, y, _, theta, w, z, _, _, _, _, theta_star, pref_vect = data_gen.generate_data(
-    args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args
+  _, x, y, _, theta, _, z, _, _, _, _, theta_star, pref_vect = data_gen.generate_data(
+    args.num_applicants, args.applicants_per_round, args.fixed_effort_conversion, args,
+    fixed_competitors=fixed_competitors
   )
+  data_dict = {'theta_star': theta_star, 'theta': theta, 'z': z, 'y': y }
 
   err_list, est_list = {}, {}
   envs_itr = [env_idx] if env_idx is not None else range(args.num_envs)
@@ -181,7 +217,7 @@ def run_multi_env(seed, args, env_idx=None):
     for k, v in dictenv_est.items():
       est_list[f'{k}_env{env_idx}'] = v
 
-  return err_list, est_list, z
+  return err_list, est_list, z, data_dict
 
 
 def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect):
