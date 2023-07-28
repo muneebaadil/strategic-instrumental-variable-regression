@@ -1,0 +1,25 @@
+{
+ "applicants_per_round": 1000,
+ "clip": false,
+ "envs_accept_rates": [
+  0.5
+ ],
+ "fixed_effort_conversion": true,
+ "methods": [
+  "2sls",
+  "ols",
+  "ours"
+ ],
+ "normalize": true,
+ "num_applicants": 100000,
+ "num_cooperative_envs": 1,
+ "num_envs": 1,
+ "offline_eval": false,
+ "pref_vect": [
+  1.0
+ ],
+ "rank_type": "prediction",
+ "scaled_duplicates": "sequence",
+ "theta_star_std": 0,
+ "utility_dataset_std": 2
+}
