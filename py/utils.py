@@ -19,6 +19,22 @@ def normalize(arrs: list, new_min: float, new_max: float) -> Tuple[List[float], 
   return out, new_range / curr_range
 
 def recover_thetas(num_applicants, applicants_per_round, y, theta, z, env_idx, est_list, test_theta):
+    """having inferred the theta_star and theta_ols, this function returns either theta_star, theta_ols, 
+    or theta_ols. Note that all returned vectors are normalized. 
+
+    Args:
+        num_applicants (int):
+        applicants_per_round (int):
+        y (np.ndarray):
+        theta (np.ndarray):
+        z (np.ndarray):
+        env_idx (int):
+        est_list (dict):
+        test_theta (np.ndarray):
+
+    Returns:
+        theta_star, theta_ao, or theta_ols (np.ndarray)
+    """
     assert test_theta in ('theta_star_hat', 'theta_ols_hat', 'theta_ao_hat')
 
     if test_theta == 'theta_star_hat':

@@ -181,7 +181,7 @@ def run_multi_env(seed, args, env_idx=None):
     for k, v in dictenv_est.items():
       est_list[f'{k}_env{env_idx}'] = v
 
-  return err_list, w, z, est_list
+  return err_list, est_list, z
 
 
 def run_single_env(args, x, y, theta, z, theta_star, env_idx, pref_vect):
