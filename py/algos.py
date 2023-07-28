@@ -1,6 +1,7 @@
 # %%
 import argparse
 import subprocess
+from copy import deepcopy
 import py.data_gen as data_gen
 
 import numpy as np
@@ -186,17 +187,19 @@ def run_multi_env_utility(args, seed, test_theta_envs):
     test_thetas = test_thetas[np.newaxis]
 
     # generating test data.
-    args.num_applicants = args.applicants_per_round # only one round.
+    args_test = deepcopy(args)
+    args_test.num_applicants = args.applicants_per_round # only one round
     _, _, _, _, _, y_test,_, _ ,z_test,_, _ = run_simulator(
-    args.applicants_per_round, args.fixed_effort_conversion, args, theta_star, test_thetas
+    args_test.applicants_per_round, args_test.fixed_effort_conversion, args_test, theta_star, test_thetas
     )
     y_test = y_test.T
 
     # compute utilities 
-    utilities = np.zeros((args.num_envs,))
-    for env_idx in range(args.num_envs):
+    utilities = np.zeros((args_test.num_envs,))
+    for env_idx in range(args_test.num_envs):
         utilities[env_idx] = y_test[:,  env_idx][z_test==(env_idx+1)].mean()
-    return utilities
+    
+    return utilities, test_thetas
 
 def run_multi_env(seed, args, env_idx=None, fixed_competitors=False):
   np.random.seed(seed)
