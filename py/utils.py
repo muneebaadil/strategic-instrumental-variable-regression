@@ -37,14 +37,17 @@ def recover_thetas(num_applicants, applicants_per_round, y, theta, z, env_idx, e
     """
     assert test_theta in ('theta_star_hat', 'theta_ols_hat', 'theta_ao_hat')
 
+    # compute theta star norm 
+    theta_star_est = est_list[f'ours_env{env_idx}'][-1]
+    theta_star_est_norm = np.linalg.norm(theta_star_est)
+    
     if test_theta == 'theta_star_hat':
         theta_star_est = est_list[f'ours_env{env_idx}'][-1]
-        theta_star_est_norm = theta_star_est / np.linalg.norm(theta_star_est)
-        return theta_star_est_norm
+        return theta_star_est
 
     elif test_theta == 'theta_ols_hat':
         theta_ols = est_list[f'ols_env{env_idx}'][-1]
-        theta_ols /= np.linalg.norm(theta_ols)
+        theta_ols *= theta_star_est_norm /np.linalg.norm(theta_ols)  # same magnitude as theta_star_hat
         return theta_ols
 
     elif test_theta == 'theta_ao_hat':
@@ -66,5 +69,5 @@ def recover_thetas(num_applicants, applicants_per_round, y, theta, z, env_idx, e
         m = LinearRegression()
         m.fit(theta_ao_input, theta_ao_target)
         theta_ao_est = m.coef_ 
-        theta_ao_est /= np.linalg.norm(theta_ao_est)
+        theta_ao_est *= theta_star_est_norm/np.linalg.norm(theta_ao_est) # same magnitude as theta_star_hat  
         return theta_ao_est 

@@ -180,9 +180,10 @@ def run_multi_env_utility(args, seed, test_theta_envs):
     # recovering test thetas. 
     test_thetas = np.zeros(shape=(args.num_envs, 2))
     for env_idx in range(args.num_envs):
+        theta_type = test_theta_envs[env_idx]
         test_thetas[env_idx] = recover_thetas(
-        args.num_applicants, args.applicants_per_round, 
-        y, theta, z, env_idx, est_list, test_theta_envs[env_idx]
+        	args.num_applicants, args.applicants_per_round, 
+        	y, theta, z, env_idx, est_list, theta_type
     )
     test_thetas = test_thetas[np.newaxis]
 
