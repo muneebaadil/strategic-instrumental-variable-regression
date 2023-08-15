@@ -52,8 +52,6 @@ def run_utility_exp():
   candidates = sk_normalize([reg.coef_, theta_stars_tr[0]], norm='l2', axis=1)
   print(candidates.round(1))
 
-  # TODO (kiet): compare utility values
-
   return
 
 

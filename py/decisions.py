@@ -58,8 +58,6 @@ class ThetaGenerator:
     T = self._T
     n = self._n
 
-    # TODO (kiet): is 'mean_shift' necessary?
-
     thetas_tr = [np.array([])] * n  # empty list
     for i in range(n):
       theta = np.random.multivariate_normal([1, 1 + i + mean_shift], [[10, 0], [0, 1]], int(T / 2))
@@ -102,7 +100,6 @@ class ThetaGenerator:
       for i in range(num_free_principals):
         out = (ThetaGenerator(length=T, num_principals=1)
             .generate_scaled_duplicates(deploy_sd_every=(2 + i),
-                                        # TODO (kiet): is shifting this necessary?
                                         mean_shift=num_cooperative_principals).transpose((1, 0, 2))  # (n,T,m)
         )
         non_coop_thetas_tr[i] = out
@@ -223,9 +220,9 @@ class Simulator:
     z = am.realise_enrollments(w_tr=w.T, gammas_tr=np.tile(gammas, reps=(T * s, 1)))
 
     # assignment
-    self.u = u  # TODO (kiet): to be removed
+    self.u = u  
     self.b_tr = b_tr
-    self.thetas_tr = thetas_tr  # TODO(kiet): to be removed
+    self.thetas_tr = thetas_tr  
     self.x_tr = x_tr
     self.eet_mean = eet_mean
     self.y_hat = y_hat
