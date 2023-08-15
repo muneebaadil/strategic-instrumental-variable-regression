@@ -3,8 +3,8 @@
 
 To instantiate the project environment:
 ```
-conda create -n strategic-iv python=3.7
-conda activate strategic-iv
+conda create -n csl python=3.7
+conda activate csl
 python -m pip install -U -r requirements.txt
 ```
 
