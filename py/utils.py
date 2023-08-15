@@ -47,7 +47,10 @@ def recover_thetas(num_applicants, applicants_per_round, y, theta, z, env_idx, e
 
     elif test_theta == 'theta_ols_hat':
         theta_ols = est_list[f'ols_env{env_idx}'][-1]
-        theta_ols *= theta_star_est_norm /np.linalg.norm(theta_ols)  # same magnitude as theta_star_hat
+        theta_ols_norm = np.linalg.norm(theta_ols)
+        
+        if theta_ols_norm > theta_star_est_norm: # scale theta ols down, in case it has larger magnitude.
+            theta_ols *= theta_star_est_norm / theta_ols_norm  # same magnitude as theta_star_hat
         return theta_ols
 
     elif test_theta == 'theta_ao_hat':
