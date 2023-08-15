@@ -1,4 +1,4 @@
-# Code for the project  ``Causal Strategic Learning with Competitive Selection''
+# Code for the project  "Causal Strategic Learning with Competitive Selection"
 
 ```
 conda create -n strategic-iv python=3.7
